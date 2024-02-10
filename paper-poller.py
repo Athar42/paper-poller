@@ -45,6 +45,16 @@ def convert_build_date(date):
     # format: 2022-06-14T10:40:30.563Z
     return dt.strptime(date, "%Y-%m-%dT%H:%M:%S.%f%z")
 
+
+def get_spigot_drama() -> str | dict:
+    try:
+        response = requests.get("https://chew.pw/api/spigotdrama", headers=headers)
+        data = response.json()
+        return data
+    except Exception as e:
+        print(f"Error getting spigot drama: {e}")
+        return "There's no drama :("
+
 class PaperAPI():
     def __init__(self, base_url="https://api.papermc.io/v2", project="paper"):
         self.headers = {
@@ -55,7 +65,7 @@ class PaperAPI():
         self.base_url = base_url
         self.project = project
 
-    def get_latest_minecraft_version(self):
+    def get_latest_minecraft_version(self) -> str:
         url = f"{self.base_url}/projects/{self.project}"
         response = requests.get(url, headers=self.headers)
         data = response.json()
@@ -65,7 +75,7 @@ class PaperAPI():
         latest_version = versions[-1]
         return latest_version
     
-    def get_latest_build_for_version(self, version):
+    def get_latest_build_for_version(self, version) -> int:
         url = f"{self.base_url}/projects/{self.project}/versions/{version}"
         response = requests.get(url, headers=self.headers)
         data = response.json()
@@ -75,13 +85,13 @@ class PaperAPI():
         latest_build = builds[-1]
         return latest_build
     
-    def get_build_info(self, version, build):
+    def get_build_info(self, version, build) -> dict:
         url = f"{self.base_url}/projects/{self.project}/versions/{version}/builds/{build}"
         response = requests.get(url, headers=self.headers)
         data = response.json()
         return data
     
-    def up_to_date(self, version, build):
+    def up_to_date(self, version, build) -> bool:
         # Read out {project}_poller.json file
         try:
             with open(f"{self.project}_poller.json", "r") as f:
@@ -94,7 +104,7 @@ class PaperAPI():
         else:
             return False
         
-    def construct_download_url(self, version, build, data):
+    def construct_download_url(self, version, build, data) -> str:
         jar_name = data["downloads"]["application"]["name"]
         return f"{self.base_url}/projects/{self.project}/versions/{version}/builds/{build}/downloads/{jar_name}"
     
@@ -103,7 +113,7 @@ class PaperAPI():
         with open(f"{self.project}_poller.json", "w") as f:
             json.dump(data, f)
 
-    def get_changes_for_build(self, data):
+    def get_changes_for_build(self, data) -> str:
         return_string = ""
         for change in data["changes"]:
             commit_hash = convert_commit_hash_to_short(change["commit"])
@@ -144,7 +154,8 @@ class PaperAPI():
                 # Timestamp
                 embed.set_timestamp(convert_build_date(build_info["time"]).timestamp())
                 # Set a footer to link to the site to add this webhook
-                embed.set_footer(text="Add this webhook to your server: to be added")
+                drama = get_spigot_drama()
+                embed.set_footer(text=drama['response'])
                 webhook.add_embed(embed)
                 # Send the webhook
                 webhook.execute()
