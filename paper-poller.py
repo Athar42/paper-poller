@@ -16,7 +16,7 @@ headers = {
 
 # Check the ENV for a webhook URL   
 if os.getenv("WEBHOOK_URL"):
-    webhook_urls = [os.getenv("WEBHOOK_URL")]
+    webhook_urls = json.loads(os.getenv("WEBHOOK_URL"))
 else: 
     webhook_urls = [
         "url.here"
@@ -161,6 +161,8 @@ def main():
     folia.run()
     velocity = PaperAPI(project="velocity")
     velocity.run()
+    waterfall = PaperAPI(project="waterfall")
+    waterfall.run()
 
 
 if __name__ == "__main__":
