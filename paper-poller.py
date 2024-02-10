@@ -131,6 +131,8 @@ class PaperAPI():
                     embed.set_author(name="Paper", url="https://papermc.io/", icon_url="https://cdn.theairplan.com/images/paperlogo.png")
                 elif self.project == "folia":
                     embed.set_author(name="Folia", url="https://papermc.io/", icon_url="https://cdn.discordapp.com/attachments/1018399544398065725/1092644957849927680/Folia_Logo_200x200.png")
+                elif self.project == "velocity":
+                    embed.set_author(name="Velocity", url="https://papermc.io/", icon_url="https://cdn.theairplan.com/images/velocity.png")
                 else:
                     embed.set_author(name=self.project.capitalize(), url="https://papermc.io/")
                 #embed.add_embed_field(name="Build", value=latest_build, inline=True)
