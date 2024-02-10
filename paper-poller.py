@@ -3,6 +3,10 @@ from discord_webhook import DiscordWebhook, DiscordEmbed
 import json
 from datetime import datetime as dt
 import sys
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
 
 headers = {
     "User-Agent": "PaperMC Version Poller",
@@ -10,9 +14,13 @@ headers = {
     "Pragma": "no-cache"
 }
 
-webhook_urls = [
-    "url.here"
-    ]
+# Check the ENV for a webhook URL   
+if os.getenv("WEBHOOK_URL"):
+    webhook_urls = [os.getenv("WEBHOOK_URL")]
+else: 
+    webhook_urls = [
+        "url.here"
+        ]
 
 # Get start args
 start_args = sys.argv[1:]
@@ -149,6 +157,8 @@ def main():
     paper.run()
     folia = PaperAPI(project="folia")
     folia.run()
+    velocity = PaperAPI(project="velocity")
+    velocity.run()
 
 
 if __name__ == "__main__":

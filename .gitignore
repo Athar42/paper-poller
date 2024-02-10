@@ -162,3 +162,5 @@ cython_debug/
 folia_poller.json
 
 paper_poller.json
+
+velocity_poller.json
