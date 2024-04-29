@@ -9,10 +9,10 @@ import os
 load_dotenv()
 
 CONFIG = {
-    "enable_pterodactyl": False, # Optionally restart a server on a new build
-    "pterodactyl_domain": "https://panel.mydomain.com",
-    "pterodactyl_api_key": "MySuper",
-    "pterodactyl_server_id": "0000"
+    "enable_pterodactyl": os.getenv("ENABLE_PTERODACTYL") == "true",
+    "pterodactyl_domain": os.getenv("PTERODACTYL_DOMAIN"),
+    "pterodactyl_api_key": os.getenv("PTERODACTYL_API_KEY"),
+    "pterodactyl_server_id": os.getenv("PTERODACTYL_SERVER_ID")
 }
 
 if CONFIG["enable_pterodactyl"]:
