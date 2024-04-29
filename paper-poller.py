@@ -8,6 +8,23 @@ import os
 
 load_dotenv()
 
+CONFIG = {
+    "enable_pterodactyl": False, # Optionally restart a server on a new build
+    "pterodactyl_domain": "https://panel.mydomain.com",
+    "pterodactyl_api_key": "MySuper",
+    "pterodactyl_server_id": "0000"
+}
+
+if CONFIG["enable_pterodactyl"]:
+    from pydactyl import PterodactylClient
+    api = PterodactylClient(CONFIG["pterodactyl_domain"], CONFIG['pterodactyl_api_key'])
+    try:
+        util = api.client.servers.get_server_utilization(CONFIG["pterodactyl_server_id"])
+        print(util)
+    except Exception as e:
+        print(f"Error getting Pterodactyl API to work, disabling Pterodactyl: {e}")
+        CONFIG["enable_pterodactyl"] = False
+
 headers = {
     "User-Agent": "PaperMC Version Poller",
     "Cache-Control": "no-cache",
@@ -122,7 +139,7 @@ class PaperAPI():
             return_string += f"- [{commit_hash}](https://github.com/PaperMC/{self.project}/commit/{full_hash}) {summary}\n"
         return return_string
     
-    def run(self):
+    def run(self, restart_on_build=False):
         current_time = dt.now()
         print(f"[{current_time}] ", end="")
         latest_version = self.get_latest_minecraft_version()
@@ -161,13 +178,20 @@ class PaperAPI():
                 webhook.execute()
                 # Write the latest version and build to the json file
             self.write_to_json(latest_version, latest_build)
+            # Restart the server if enabled
+            if CONFIG["enable_pterodactyl"] and restart_on_build:
+                try:
+                    print("Restarting server")
+                    api.client.servers.send_power_action(CONFIG["pterodactyl_server_id"], "restart")
+                except Exception as e:
+                    print(f"Error restarting server: {e}")
         else:
             print("Up to date")
 
 
 def main():
     paper = PaperAPI()
-    paper.run()
+    paper.run(restart_on_build=True)
     folia = PaperAPI(project="folia")
     folia.run()
     velocity = PaperAPI(project="velocity")
