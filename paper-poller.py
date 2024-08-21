@@ -5,6 +5,7 @@ from datetime import datetime as dt
 import sys
 from dotenv import load_dotenv
 import os
+from filelock import Timeout, FileLock
 
 load_dotenv()
 
@@ -12,7 +13,8 @@ CONFIG = {
     "enable_pterodactyl": os.getenv("ENABLE_PTERODACTYL") == "true",
     "pterodactyl_domain": os.getenv("PTERODACTYL_DOMAIN"),
     "pterodactyl_api_key": os.getenv("PTERODACTYL_API_KEY"),
-    "pterodactyl_server_id": os.getenv("PTERODACTYL_SERVER_ID")
+    "pterodactyl_server_id": os.getenv("PTERODACTYL_SERVER_ID"),
+    "pterodactyl_schedule_id": os.getenv("PTERODACTYL_SCHEDULE_ID") or None
 }
 
 if CONFIG["enable_pterodactyl"]:
@@ -21,6 +23,8 @@ if CONFIG["enable_pterodactyl"]:
     try:
         util = api.client.servers.get_server_utilization(CONFIG["pterodactyl_server_id"])
         print(util)
+        schedule = api.client.servers.schedules.get_schedule_details(CONFIG["pterodactyl_server_id"], CONFIG["pterodactyl_schedule_id"])
+        print(schedule)
     except Exception as e:
         print(f"Error getting Pterodactyl API to work, disabling Pterodactyl: {e}")
         CONFIG["enable_pterodactyl"] = False
@@ -182,7 +186,20 @@ class PaperAPI():
             if CONFIG["enable_pterodactyl"] and restart_on_build:
                 try:
                     print("Restarting server")
-                    api.client.servers.send_power_action(CONFIG["pterodactyl_server_id"], "restart")
+                    if CONFIG["pterodactyl_schedule_id"]:
+                        # Check to make sure we're not already rebooting
+                        processing = api.client.servers.schedules.get_schedule_details(CONFIG['pterodactyl_server_id'], CONFIG["pterodactyl_schedule_id"])['attributes']['is_processing']
+                        if not processing:
+                            api.client.servers.schedules.run_schedule(CONFIG['pterodactyl_server_id'], CONFIG["pterodactyl_schedule_id"])
+                        else:
+                            print("Skipping schedule since it's currently processing")
+                    else:
+                        # Check if state is running before restarting
+                        state = api.client.servers.get_server_utilization(CONFIG["pterodactyl_server_id"])["current_state"]
+                        if state == "running":
+                            api.client.servers.send_power_action(CONFIG["pterodactyl_server_id"], "restart")
+                        else:
+                            print("Server is not running, skipping restart")
                 except Exception as e:
                     print(f"Error restarting server: {e}")
         else:
@@ -190,14 +207,20 @@ class PaperAPI():
 
 
 def main():
-    paper = PaperAPI()
-    paper.run(restart_on_build=True)
-    folia = PaperAPI(project="folia")
-    folia.run()
-    velocity = PaperAPI(project="velocity")
-    velocity.run()
-    waterfall = PaperAPI(project="waterfall")
-    waterfall.run()
+    try:
+        lock_file = "paper_poller.lock"
+        lock = FileLock(lock_file, timeout=10)
+        with lock:
+            paper = PaperAPI()
+            paper.run(restart_on_build=True)
+            folia = PaperAPI(project="folia")
+            folia.run()
+            velocity = PaperAPI(project="velocity")
+            velocity.run()
+            waterfall = PaperAPI(project="waterfall")
+            waterfall.run()
+    except Timeout:
+        print("Lock file is locked, exiting")
 
 
 if __name__ == "__main__":
