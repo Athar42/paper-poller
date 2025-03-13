@@ -73,7 +73,7 @@ def convert_build_date(date):
 
 def get_spigot_drama() -> str | dict:
     try:
-        response = requests.get("https://chew.pw/api/spigotdrama", headers=headers)
+        response = requests.get("https://drama.mart.fyi/api", headers=headers)
         data = response.json()
         return data
     except Exception as e:
