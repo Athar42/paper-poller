@@ -6,6 +6,7 @@ import sys
 from dotenv import load_dotenv
 import os
 from filelock import Timeout, FileLock
+import re
 
 load_dotenv()
 
@@ -38,6 +39,9 @@ headers = {
 # Check the ENV for a webhook URL   
 if os.getenv("WEBHOOK_URL"):
     webhook_urls = json.loads(os.getenv("WEBHOOK_URL"))
+elif os.path.exists("webhooks.json"):
+    with open("webhooks.json", "r") as f:
+        webhook_urls = json.load(f)["urls"]
 else: 
     webhook_urls = [
         "url.here"
@@ -140,6 +144,12 @@ class PaperAPI():
             commit_hash = convert_commit_hash_to_short(change["commit"])
             full_hash = change["commit"]
             summary = change["summary"]
+            # Look for any #\d+ in the summary, these are most likely PRs/Issues that we can link to
+            pr_numbers = re.findall(r'#(\d+)', summary)
+            if pr_numbers:
+                for pr_number in pr_numbers:
+                    # Add a link to the PR/Issue
+                    summary = summary.replace(f"#{pr_number}", f"[#{pr_number}](https://github.com/PaperMC/{self.project}/issues/{pr_number})")
             return_string += f"- [{commit_hash}](https://github.com/PaperMC/{self.project}/commit/{full_hash}) {summary}\n"
         return return_string
     
