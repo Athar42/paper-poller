@@ -15,16 +15,22 @@ CONFIG = {
     "pterodactyl_domain": os.getenv("PTERODACTYL_DOMAIN"),
     "pterodactyl_api_key": os.getenv("PTERODACTYL_API_KEY"),
     "pterodactyl_server_id": os.getenv("PTERODACTYL_SERVER_ID"),
-    "pterodactyl_schedule_id": os.getenv("PTERODACTYL_SCHEDULE_ID") or None
+    "pterodactyl_schedule_id": os.getenv("PTERODACTYL_SCHEDULE_ID") or None,
+    "use_components_v2": os.getenv("USE_COMPONENTS_V2") == "true",
 }
 
 if CONFIG["enable_pterodactyl"]:
     from pydactyl import PterodactylClient
-    api = PterodactylClient(CONFIG["pterodactyl_domain"], CONFIG['pterodactyl_api_key'])
+
+    api = PterodactylClient(CONFIG["pterodactyl_domain"], CONFIG["pterodactyl_api_key"])
     try:
-        util = api.client.servers.get_server_utilization(CONFIG["pterodactyl_server_id"])
+        util = api.client.servers.get_server_utilization(
+            CONFIG["pterodactyl_server_id"]
+        )
         print(util)
-        schedule = api.client.servers.schedules.get_schedule_details(CONFIG["pterodactyl_server_id"], CONFIG["pterodactyl_schedule_id"])
+        schedule = api.client.servers.schedules.get_schedule_details(
+            CONFIG["pterodactyl_server_id"], CONFIG["pterodactyl_schedule_id"]
+        )
         print(schedule)
     except Exception as e:
         print(f"Error getting Pterodactyl API to work, disabling Pterodactyl: {e}")
@@ -33,19 +39,17 @@ if CONFIG["enable_pterodactyl"]:
 headers = {
     "User-Agent": "PaperMC Version Poller",
     "Cache-Control": "no-cache",
-    "Pragma": "no-cache"
+    "Pragma": "no-cache",
 }
 
-# Check the ENV for a webhook URL   
+# Check the ENV for a webhook URL
 if os.getenv("WEBHOOK_URL"):
     webhook_urls = json.loads(os.getenv("WEBHOOK_URL"))
 elif os.path.exists("webhooks.json"):
     with open("webhooks.json", "r") as f:
         webhook_urls = json.load(f)["urls"]
 else:
-    webhook_urls = [
-        "url.here"
-    ]
+    webhook_urls = ["url.here"]
 
 # Get start args
 start_args = sys.argv[1:]
@@ -81,12 +85,12 @@ def get_spigot_drama() -> str | dict:
         return "There's no drama :("
 
 
-class PaperAPI():
+class PaperAPI:
     def __init__(self, base_url="https://api.papermc.io/v2", project="paper"):
         self.headers = {
             "User-Agent": "PaperMC Version Poller",
             "Cache-Control": "no-cache",
-            "Pragma": "no-cache"
+            "Pragma": "no-cache",
         }
         self.base_url = base_url
         self.project = project
@@ -100,7 +104,7 @@ class PaperAPI():
         # Get the latest version
         latest_version = versions[-1]
         return latest_version
-    
+
     def get_latest_build_for_version(self, version) -> int:
         url = f"{self.base_url}/projects/{self.project}/versions/{version}"
         response = requests.get(url, headers=self.headers)
@@ -110,13 +114,15 @@ class PaperAPI():
         # Get the latest build
         latest_build = builds[-1]
         return latest_build
-    
+
     def get_build_info(self, version, build) -> dict:
-        url = f"{self.base_url}/projects/{self.project}/versions/{version}/builds/{build}"
+        url = (
+            f"{self.base_url}/projects/{self.project}/versions/{version}/builds/{build}"
+        )
         response = requests.get(url, headers=self.headers)
         data = response.json()
         return data
-    
+
     def up_to_date(self, version, build) -> bool:
         # Read out {project}_poller.json file
         try:
@@ -129,11 +135,11 @@ class PaperAPI():
             return True
         else:
             return False
-        
+
     def construct_download_url(self, version, build, data) -> str:
         jar_name = data["downloads"]["application"]["name"]
         return f"{self.base_url}/projects/{self.project}/versions/{version}/builds/{build}/downloads/{jar_name}"
-    
+
     def write_to_json(self, version, build):
         data = {"version": version, "build": build}
         with open(f"{self.project}_poller.json", "w") as f:
@@ -146,14 +152,17 @@ class PaperAPI():
             full_hash = change["commit"]
             summary = change["summary"]
             # Look for any #\d+ in the summary, these are most likely PRs/Issues that we can link to
-            pr_numbers = re.findall(r'#(\d+)', summary)
+            pr_numbers = re.findall(r"#(\d+)", summary)
             if pr_numbers:
                 for pr_number in pr_numbers:
                     # Add a link to the PR/Issue
-                    summary = summary.replace(f"#{pr_number}", f"[#{pr_number}](https://github.com/PaperMC/{self.project}/issues/{pr_number})")
+                    summary = summary.replace(
+                        f"#{pr_number}",
+                        f"[#{pr_number}](https://github.com/PaperMC/{self.project}/issues/{pr_number})",
+                    )
             return_string += f"- [{commit_hash}](https://github.com/PaperMC/{self.project}/commit/{full_hash}) {summary}\n"
         return return_string
-    
+
     def run(self, restart_on_build=False):
         current_time = dt.now()
         print(f"[{current_time}] ", end="")
@@ -163,34 +172,140 @@ class PaperAPI():
         if not updated:
             print("New build. Sending update.")
             build_info = self.get_build_info(latest_version, latest_build)
+            changes = self.get_changes_for_build(build_info)
+            download_url = self.construct_download_url(latest_version, latest_build, build_info)
+            build_time = int(convert_build_date(build_info["time"]).timestamp())
             # Create a new webhook
             for hook in webhook_urls:
-                webhook = DiscordWebhook(url=hook, rate_limit_retry=True)
-                # Create a new embed
-                embed = DiscordEmbed(title=f"{self.project.capitalize()} Update", description=f"Build {latest_build} for {latest_version} is now available!", color=0x00ff00)
-                # Add the latest build to the embed
-                if self.project == "paper":
-                    embed.set_author(name="Paper", url="https://papermc.io/", icon_url="https://cdn.theairplan.com/images/paperlogo.png")
-                elif self.project == "folia":
-                    embed.set_author(name="Folia", url="https://papermc.io/", icon_url="https://cdn.discordapp.com/attachments/1018399544398065725/1092644957849927680/Folia_Logo_200x200.png")
-                elif self.project == "velocity":
-                    embed.set_author(name="Velocity", url="https://papermc.io/", icon_url="https://cdn.theairplan.com/images/velocity.png")
-                else:
-                    embed.set_author(name=self.project.capitalize(), url="https://papermc.io/")
-                # embed.add_embed_field(name="Build", value=latest_build, inline=True)
-                # embed.add_embed_field(name="Version", value=latest_version, inline=True)
-                embed.add_embed_field(name="Link", value=self.construct_download_url(latest_version, latest_build, build_info), inline=False)
-                # embed.add_embed_field(name="sha256", value=build_info["downloads"]["application"]["sha256"], inline=False)
-                embed.add_embed_field(name="Changes", value=self.get_changes_for_build(build_info), inline=False)
-                # embed.add_embed_field(name="Build Channel", value=build_info["channel"], inline=False)
-                # Timestamp
-                embed.set_timestamp(convert_build_date(build_info["time"]).timestamp())
-                # Set a footer to link to the site to add this webhook
                 drama = get_spigot_drama()
-                embed.set_footer(text=drama['response'])
-                webhook.add_embed(embed)
-                # Send the webhook
-                webhook.execute()
+                if not CONFIG["use_components_v2"]:
+                    webhook = DiscordWebhook(url=hook, rate_limit_retry=True)
+                    # Create a new embed
+                    embed = DiscordEmbed(
+                        title=f"{self.project.capitalize()} Update",
+                        description=f"Build {latest_build} for {latest_version} is now available!",
+                        color=0x00FF00,
+                    )
+                    # Add the latest build to the embed
+                    if self.project == "paper":
+                        embed.set_author(
+                            name="Paper",
+                            url="https://papermc.io/",
+                            icon_url="https://cdn.theairplan.com/images/paperlogo.png",
+                        )
+                    elif self.project == "folia":
+                        embed.set_author(
+                            name="Folia",
+                            url="https://papermc.io/",
+                            icon_url="https://cdn.discordapp.com/attachments/1018399544398065725/1092644957849927680/Folia_Logo_200x200.png",
+                        )
+                    elif self.project == "velocity":
+                        embed.set_author(
+                            name="Velocity",
+                            url="https://papermc.io/",
+                            icon_url="https://cdn.theairplan.com/images/velocity.png",
+                        )
+                    else:
+                        embed.set_author(
+                            name=self.project.capitalize(), url="https://papermc.io/"
+                        )
+                    # embed.add_embed_field(name="Build", value=latest_build, inline=True)
+                    # embed.add_embed_field(name="Version", value=latest_version, inline=True)
+                    embed.add_embed_field(
+                        name="Link",
+                        value=download_url,
+                        inline=False,
+                    )
+                    # embed.add_embed_field(name="sha256", value=build_info["downloads"]["application"]["sha256"], inline=False)
+                    embed.add_embed_field(
+                        name="Changes",
+                        value=changes,
+                        inline=False,
+                    )
+                    # embed.add_embed_field(name="Build Channel", value=build_info["channel"], inline=False)
+                    # Timestamp
+                    embed.set_timestamp(
+                        build_time
+                    )
+                    # Set a footer to link to the site to add this webhook
+                    
+                    embed.set_footer(text=drama["response"])
+                    webhook.add_embed(embed)
+                    # Send the webhook
+                    webhook.execute()
+                    continue
+                # Otherwise we have to hand roll it since there's no library support for components v2
+                image_url = ""
+                if self.project == "paper":
+                    image_url = "https://cdn.theairplan.com/images/paperlogo.png"
+                elif self.project == "folia":
+                    image_url = "https://cdn.discordapp.com/attachments/1018399544398065725/1092644957849927680/Folia_Logo_200x200.png"
+                elif self.project == "velocity":
+                    image_url = "https://cdn.theairplan.com/images/velocity.png"
+                payload = {
+                    "components": [
+                        {
+                            "type": 17,
+                            "accent_color": 0x00FF00,
+                            "components": [
+                                {
+                                    "type": 9,
+                                    "components": [
+                                        {
+                                            "type": 10,
+                                            "content": f"# {self.project.capitalize()} Update",
+                                        },
+                                        {
+                                            "type": 10,
+                                            "content": f"Build {latest_build} for {latest_version} is now available!\nReleased <t:{build_time}:R> (<t:{build_time}:f>)",
+                                        },
+                                    ],
+                                    "accessory": {
+                                        "type": 11,
+                                        "media": {
+                                            "url": image_url
+                                        }
+                                    }
+                                },
+                                {
+                                    "type": 14,
+                                    "divider": True
+                                },
+                                {
+                                    "type": 10,
+                                    "content": changes
+                                },
+                                {
+                                    "type": 14,
+                                    "divider": True
+                                },
+                                {
+                                    "type": 10,
+                                    "content": f"-# {drama['response']}"
+                                }
+                            ]
+                        },
+                        {
+                            "type": 1,
+                            "components": [
+                                {
+                                    "type": 2,
+                                    "label": "Download",
+                                    "style": 5,
+                                    "url": download_url
+                                }
+                            ]
+                        }
+                    ],
+                    "flags": 1 << 15,
+                }
+                # Then do a post to the webhook with ?with_components=true
+                requests.post(
+                    hook,
+                    json=payload,
+                    params={"with_components": "true"}
+                )
+
                 # Write the latest version and build to the json file
             self.write_to_json(latest_version, latest_build)
             # Restart the server if enabled
@@ -199,16 +314,26 @@ class PaperAPI():
                     print("Restarting server")
                     if CONFIG["pterodactyl_schedule_id"]:
                         # Check to make sure we're not already rebooting
-                        processing = api.client.servers.schedules.get_schedule_details(CONFIG['pterodactyl_server_id'], CONFIG["pterodactyl_schedule_id"])['attributes']['is_processing']
+                        processing = api.client.servers.schedules.get_schedule_details(
+                            CONFIG["pterodactyl_server_id"],
+                            CONFIG["pterodactyl_schedule_id"],
+                        )["attributes"]["is_processing"]
                         if not processing:
-                            api.client.servers.schedules.run_schedule(CONFIG['pterodactyl_server_id'], CONFIG["pterodactyl_schedule_id"])
+                            api.client.servers.schedules.run_schedule(
+                                CONFIG["pterodactyl_server_id"],
+                                CONFIG["pterodactyl_schedule_id"],
+                            )
                         else:
                             print("Skipping schedule since it's currently processing")
                     else:
                         # Check if state is running before restarting
-                        state = api.client.servers.get_server_utilization(CONFIG["pterodactyl_server_id"])["current_state"]
+                        state = api.client.servers.get_server_utilization(
+                            CONFIG["pterodactyl_server_id"]
+                        )["current_state"]
                         if state == "running":
-                            api.client.servers.send_power_action(CONFIG["pterodactyl_server_id"], "restart")
+                            api.client.servers.send_power_action(
+                                CONFIG["pterodactyl_server_id"], "restart"
+                            )
                         else:
                             print("Server is not running, skipping restart")
                 except Exception as e:
