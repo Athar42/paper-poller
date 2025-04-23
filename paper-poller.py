@@ -42,10 +42,10 @@ if os.getenv("WEBHOOK_URL"):
 elif os.path.exists("webhooks.json"):
     with open("webhooks.json", "r") as f:
         webhook_urls = json.load(f)["urls"]
-else: 
+else:
     webhook_urls = [
         "url.here"
-        ]
+    ]
 
 # Get start args
 start_args = sys.argv[1:]
@@ -79,6 +79,7 @@ def get_spigot_drama() -> str | dict:
     except Exception as e:
         print(f"Error getting spigot drama: {e}")
         return "There's no drama :("
+
 
 class PaperAPI():
     def __init__(self, base_url="https://api.papermc.io/v2", project="paper"):
@@ -176,12 +177,12 @@ class PaperAPI():
                     embed.set_author(name="Velocity", url="https://papermc.io/", icon_url="https://cdn.theairplan.com/images/velocity.png")
                 else:
                     embed.set_author(name=self.project.capitalize(), url="https://papermc.io/")
-                #embed.add_embed_field(name="Build", value=latest_build, inline=True)
-                #embed.add_embed_field(name="Version", value=latest_version, inline=True)
+                # embed.add_embed_field(name="Build", value=latest_build, inline=True)
+                # embed.add_embed_field(name="Version", value=latest_version, inline=True)
                 embed.add_embed_field(name="Link", value=self.construct_download_url(latest_version, latest_build, build_info), inline=False)
-                #embed.add_embed_field(name="sha256", value=build_info["downloads"]["application"]["sha256"], inline=False)
+                # embed.add_embed_field(name="sha256", value=build_info["downloads"]["application"]["sha256"], inline=False)
                 embed.add_embed_field(name="Changes", value=self.get_changes_for_build(build_info), inline=False)
-                #embed.add_embed_field(name="Build Channel", value=build_info["channel"], inline=False)
+                # embed.add_embed_field(name="Build Channel", value=build_info["channel"], inline=False)
                 # Timestamp
                 embed.set_timestamp(convert_build_date(build_info["time"]).timestamp())
                 # Set a footer to link to the site to add this webhook
