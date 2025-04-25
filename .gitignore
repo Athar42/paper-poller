@@ -168,3 +168,5 @@ velocity_poller.json
 waterfall_poller.json
 
 webhooks.json
+
+paper_poller.lock

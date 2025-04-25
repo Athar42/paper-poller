@@ -94,6 +94,13 @@ class PaperAPI:
         }
         self.base_url = base_url
         self.project = project
+        self.image_url = ""
+        if self.project == "paper":
+            self.image_url = "https://assets.papermc.io/brand/papermc_logo.512.png"
+        elif self.project == "folia":
+            self.image_url = "https://cdn.discordapp.com/attachments/1018399544398065725/1092644957849927680/Folia_Logo_200x200.png"
+        elif self.project == "velocity":
+            self.image_url = "https://cdn.discordapp.com/attachments/1022538177908592681/1365376228843851799/velocity_logo_blue.min.png"
 
     def get_latest_minecraft_version(self) -> str:
         url = f"{self.base_url}/projects/{self.project}"
@@ -163,6 +170,71 @@ class PaperAPI:
             return_string += f"- [{commit_hash}](https://github.com/PaperMC/{self.project}/commit/{full_hash}) {summary}\n"
         return return_string
 
+    def send_v2_webhook(self, hook_url, latest_build, latest_version, build_time, image_url, changes, download_url, drama):
+        payload = {
+            "components": [
+                {
+                    "type": 17,
+                    "accent_color": 0x00FF00,
+                    "components": [
+                        {
+                            "type": 9,
+                            "components": [
+                                {
+                                    "type": 10,
+                                    "content": f"# {self.project.capitalize()} Update",
+                                },
+                                {
+                                    "type": 10,
+                                    "content": f"Build {latest_build} for {latest_version} is now available!\nReleased <t:{build_time}:R> (<t:{build_time}:f>)",
+                                },
+                            ],
+                            "accessory": {
+                                "type": 11,
+                                "media": {
+                                    "url": image_url
+                                }
+                            }
+                        },
+                        {
+                            "type": 14,
+                            "divider": True
+                        },
+                        {
+                            "type": 10,
+                            "content": changes
+                        },
+                        {
+                            "type": 14,
+                            "divider": True
+                        },
+                        {
+                            "type": 10,
+                            "content": f"-# {drama['response']}"
+                        }
+                    ]
+                },
+                {
+                    "type": 1,
+                    "components": [
+                        {
+                            "type": 2,
+                            "label": "Download",
+                            "style": 5,
+                            "url": download_url
+                        }
+                    ]
+                }
+            ],
+            "flags": 1 << 15,
+        }
+        # Then do a post to the webhook with ?with_components=true
+        requests.post(
+            hook_url,
+            json=payload,
+            params={"with_components": "true"}
+        )
+
     def run(self, restart_on_build=False):
         current_time = dt.now()
         print(f"[{current_time}] ", end="")
@@ -191,19 +263,19 @@ class PaperAPI:
                         embed.set_author(
                             name="Paper",
                             url="https://papermc.io/",
-                            icon_url="https://cdn.theairplan.com/images/paperlogo.png",
+                            icon_url=self.image_url,
                         )
                     elif self.project == "folia":
                         embed.set_author(
                             name="Folia",
                             url="https://papermc.io/",
-                            icon_url="https://cdn.discordapp.com/attachments/1018399544398065725/1092644957849927680/Folia_Logo_200x200.png",
+                            icon_url=self.image_url,
                         )
                     elif self.project == "velocity":
                         embed.set_author(
                             name="Velocity",
                             url="https://papermc.io/",
-                            icon_url="https://cdn.theairplan.com/images/velocity.png",
+                            icon_url=self.image_url,
                         )
                     else:
                         embed.set_author(
@@ -235,75 +307,15 @@ class PaperAPI:
                     webhook.execute()
                     continue
                 # Otherwise we have to hand roll it since there's no library support for components v2
-                image_url = ""
-                if self.project == "paper":
-                    image_url = "https://cdn.theairplan.com/images/paperlogo.png"
-                elif self.project == "folia":
-                    image_url = "https://cdn.discordapp.com/attachments/1018399544398065725/1092644957849927680/Folia_Logo_200x200.png"
-                elif self.project == "velocity":
-                    image_url = "https://cdn.theairplan.com/images/velocity.png"
-                payload = {
-                    "components": [
-                        {
-                            "type": 17,
-                            "accent_color": 0x00FF00,
-                            "components": [
-                                {
-                                    "type": 9,
-                                    "components": [
-                                        {
-                                            "type": 10,
-                                            "content": f"# {self.project.capitalize()} Update",
-                                        },
-                                        {
-                                            "type": 10,
-                                            "content": f"Build {latest_build} for {latest_version} is now available!\nReleased <t:{build_time}:R> (<t:{build_time}:f>)",
-                                        },
-                                    ],
-                                    "accessory": {
-                                        "type": 11,
-                                        "media": {
-                                            "url": image_url
-                                        }
-                                    }
-                                },
-                                {
-                                    "type": 14,
-                                    "divider": True
-                                },
-                                {
-                                    "type": 10,
-                                    "content": changes
-                                },
-                                {
-                                    "type": 14,
-                                    "divider": True
-                                },
-                                {
-                                    "type": 10,
-                                    "content": f"-# {drama['response']}"
-                                }
-                            ]
-                        },
-                        {
-                            "type": 1,
-                            "components": [
-                                {
-                                    "type": 2,
-                                    "label": "Download",
-                                    "style": 5,
-                                    "url": download_url
-                                }
-                            ]
-                        }
-                    ],
-                    "flags": 1 << 15,
-                }
-                # Then do a post to the webhook with ?with_components=true
-                requests.post(
-                    hook,
-                    json=payload,
-                    params={"with_components": "true"}
+                self.send_v2_webhook(
+                    hook_url=hook,
+                    latest_build=latest_build,
+                    latest_version=latest_version,
+                    build_time=build_time,
+                    image_url=self.image_url,
+                    changes=changes,
+                    download_url=download_url,
+                    drama=drama
                 )
 
                 # Write the latest version and build to the json file
