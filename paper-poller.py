@@ -239,7 +239,7 @@ class PaperAPI:
                         },
                         {
                             "type": 10,
-                            "content": f"-# {drama['response']} @everyone"
+                            "content": f"-# {drama['response']}"
                         }
                     ]
                 },
