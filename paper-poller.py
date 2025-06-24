@@ -108,6 +108,33 @@ class PaperAPI:
         data = response.json()
         # Get the versions list
         versions = data["versions"]
+
+        # Sort the versions using semantic ordering while safely handling suffixes like "-rc1" or "-pre2"
+
+        def _version_key(ver: str):
+            """Return a tuple usable as a sort key for Minecraft version strings.
+
+            Rules:
+            1. Split off any suffix that follows a hyphen (e.g. "1.20.2-rc1" -> "1.20.2", "rc1").
+            2. Convert the numeric components to integers, padding missing parts with zeros so
+               that "1.19" is treated as "1.19.0" for comparison.
+            3. Stable releases (no suffix) should sort *after* any pre-release of the same
+               numeric version, so we use a flag where stable = 1 and prerelease = 0.
+            """
+
+            base, _, suffix = ver.partition("-")  # partition keeps remainder if "-" exists
+
+            # Convert the dotted parts (major.minor[.patch]) to integers, padding to length 3
+            parts = [int(p) if p.isdigit() else 0 for p in base.split(".")]
+            while len(parts) < 3:
+                parts.append(0)
+
+            # Stable versions (no suffix) should come later in an ascending sort order
+            stable_flag = 1 if suffix == "" else 0
+
+            return (*parts, stable_flag)
+
+        versions.sort(key=_version_key)
         # Get the latest version
         latest_version = versions[-1]
         return latest_version
@@ -144,7 +171,9 @@ class PaperAPI:
             return False
 
     def construct_download_url(self, version, build, data) -> str:
-        jar_name = data["downloads"]["application"]["name"]
+        # Find the first key in the downloads object and use that as the key for the file
+        first_key = next(iter(data["downloads"]))
+        jar_name = data["downloads"][first_key]["name"]
         return f"{self.base_url}/projects/{self.project}/versions/{version}/builds/{build}/downloads/{jar_name}"
 
     def write_to_json(self, version, build):
@@ -210,7 +239,7 @@ class PaperAPI:
                         },
                         {
                             "type": 10,
-                            "content": f"-# {drama['response']}"
+                            "content": f"-# {drama['response']} @everyone"
                         }
                     ]
                 },
@@ -227,6 +256,7 @@ class PaperAPI:
                 }
             ],
             "flags": 1 << 15,
+            "allowed_mentions": {"parse": []}
         }
         # Then do a post to the webhook with ?with_components=true
         requests.post(
@@ -242,7 +272,9 @@ class PaperAPI:
         latest_build = self.get_latest_build_for_version(latest_version)
         updated = self.up_to_date(latest_version, latest_build)
         if not updated:
-            print("New build. Sending update.")
+            print(f"New build. Sending update for {self.project}.")
+            # Write the latest version and build to the json file
+            self.write_to_json(latest_version, latest_build)
             build_info = self.get_build_info(latest_version, latest_build)
             changes = self.get_changes_for_build(build_info)
             download_url = self.construct_download_url(latest_version, latest_build, build_info)
@@ -318,8 +350,6 @@ class PaperAPI:
                     drama=drama
                 )
 
-                # Write the latest version and build to the json file
-            self.write_to_json(latest_version, latest_build)
             # Restart the server if enabled
             if CONFIG["enable_pterodactyl"] and restart_on_build:
                 try:
@@ -351,7 +381,7 @@ class PaperAPI:
                 except Exception as e:
                     print(f"Error restarting server: {e}")
         else:
-            print("Up to date")
+            print(f"Up to date for {self.project}")
 
 
 def main():
