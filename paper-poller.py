@@ -1,5 +1,4 @@
 import requests
-from discord_webhook import DiscordWebhook, DiscordEmbed
 import json
 from datetime import datetime as dt
 import sys
@@ -7,34 +6,10 @@ from dotenv import load_dotenv
 import os
 from filelock import Timeout, FileLock
 import re
+from gql import gql, Client
+from gql.transport.requests import RequestsHTTPTransport
 
 load_dotenv()
-
-CONFIG = {
-    "enable_pterodactyl": os.getenv("ENABLE_PTERODACTYL") == "true",
-    "pterodactyl_domain": os.getenv("PTERODACTYL_DOMAIN"),
-    "pterodactyl_api_key": os.getenv("PTERODACTYL_API_KEY"),
-    "pterodactyl_server_id": os.getenv("PTERODACTYL_SERVER_ID"),
-    "pterodactyl_schedule_id": os.getenv("PTERODACTYL_SCHEDULE_ID") or None,
-    "use_components_v2": os.getenv("USE_COMPONENTS_V2") == "true",
-}
-
-if CONFIG["enable_pterodactyl"]:
-    from pydactyl import PterodactylClient
-
-    api = PterodactylClient(CONFIG["pterodactyl_domain"], CONFIG["pterodactyl_api_key"])
-    try:
-        util = api.client.servers.get_server_utilization(
-            CONFIG["pterodactyl_server_id"]
-        )
-        print(util)
-        schedule = api.client.servers.schedules.get_schedule_details(
-            CONFIG["pterodactyl_server_id"], CONFIG["pterodactyl_schedule_id"]
-        )
-        print(schedule)
-    except Exception as e:
-        print(f"Error getting Pterodactyl API to work, disabling Pterodactyl: {e}")
-        CONFIG["enable_pterodactyl"] = False
 
 headers = {
     "User-Agent": "PaperMC Version Poller",
@@ -63,7 +38,40 @@ if "--stdin" in start_args:
     webhook_urls = data["urls"]
 
 
-paper_base = "https://api.papermc.io/v2"
+gql_base = "https://fill.papermc.io/graphql"
+
+transport = RequestsHTTPTransport(url=gql_base)
+client = Client(transport=transport, fetch_schema_from_transport=True)
+
+latest_query = gql(
+    """
+query getLatestBuild($project: String!) {
+    project(id: $project) {
+        id
+        versions(last: 1) {
+            id
+            builds(last: 1) {
+                id
+                download(name: "server:default") {
+                    name
+                    size
+                    url
+                    checksums {
+                        sha256
+                    }
+                }
+                commits {
+                    sha
+                    message
+                }
+                time
+                channel
+            }
+        }
+    }
+}
+"""
+)
 
 
 def convert_commit_hash_to_short(hash):
@@ -102,61 +110,6 @@ class PaperAPI:
         elif self.project == "velocity":
             self.image_url = "https://cdn.discordapp.com/attachments/1022538177908592681/1365376228843851799/velocity_logo_blue.min.png"
 
-    def get_latest_minecraft_version(self) -> str:
-        url = f"{self.base_url}/projects/{self.project}"
-        response = requests.get(url, headers=self.headers)
-        data = response.json()
-        # Get the versions list
-        versions = data["versions"]
-
-        # Sort the versions using semantic ordering while safely handling suffixes like "-rc1" or "-pre2"
-
-        def _version_key(ver: str):
-            """Return a tuple usable as a sort key for Minecraft version strings.
-
-            Rules:
-            1. Split off any suffix that follows a hyphen (e.g. "1.20.2-rc1" -> "1.20.2", "rc1").
-            2. Convert the numeric components to integers, padding missing parts with zeros so
-               that "1.19" is treated as "1.19.0" for comparison.
-            3. Stable releases (no suffix) should sort *after* any pre-release of the same
-               numeric version, so we use a flag where stable = 1 and prerelease = 0.
-            """
-
-            base, _, suffix = ver.partition("-")  # partition keeps remainder if "-" exists
-
-            # Convert the dotted parts (major.minor[.patch]) to integers, padding to length 3
-            parts = [int(p) if p.isdigit() else 0 for p in base.split(".")]
-            while len(parts) < 3:
-                parts.append(0)
-
-            # Stable versions (no suffix) should come later in an ascending sort order
-            stable_flag = 1 if suffix == "" else 0
-
-            return (*parts, stable_flag)
-
-        versions.sort(key=_version_key)
-        # Get the latest version
-        latest_version = versions[-1]
-        return latest_version
-
-    def get_latest_build_for_version(self, version) -> int:
-        url = f"{self.base_url}/projects/{self.project}/versions/{version}"
-        response = requests.get(url, headers=self.headers)
-        data = response.json()
-        # Get the builds list
-        builds = data["builds"]
-        # Get the latest build
-        latest_build = builds[-1]
-        return latest_build
-
-    def get_build_info(self, version, build) -> dict:
-        url = (
-            f"{self.base_url}/projects/{self.project}/versions/{version}/builds/{build}"
-        )
-        response = requests.get(url, headers=self.headers)
-        data = response.json()
-        return data
-
     def up_to_date(self, version, build) -> bool:
         # Read out {project}_poller.json file
         try:
@@ -170,12 +123,6 @@ class PaperAPI:
         else:
             return False
 
-    def construct_download_url(self, version, build, data) -> str:
-        # Find the first key in the downloads object and use that as the key for the file
-        first_key = next(iter(data["downloads"]))
-        jar_name = data["downloads"][first_key]["name"]
-        return f"{self.base_url}/projects/{self.project}/versions/{version}/builds/{build}/downloads/{jar_name}"
-
     def write_to_json(self, version, build):
         data = {"version": version, "build": build}
         with open(f"{self.project}_poller.json", "w") as f:
@@ -183,23 +130,31 @@ class PaperAPI:
 
     def get_changes_for_build(self, data) -> str:
         return_string = ""
-        for change in data["changes"]:
-            commit_hash = convert_commit_hash_to_short(change["commit"])
-            full_hash = change["commit"]
-            summary = change["summary"]
-            # Look for any #\d+ in the summary, these are most likely PRs/Issues that we can link to
-            pr_numbers = re.findall(r"#(\d+)", summary)
-            if pr_numbers:
-                for pr_number in pr_numbers:
-                    # Add a link to the PR/Issue
-                    summary = summary.replace(
-                        f"#{pr_number}",
-                        f"[#{pr_number}](https://github.com/PaperMC/{self.project}/issues/{pr_number})",
-                    )
+        for change in data["commits"]:
+            commit_hash = convert_commit_hash_to_short(change["sha"])
+            full_hash = change["sha"]
+            summary = change["message"]
+            # remove any newlines from the summary
+            summary = summary.replace("\n", " ")
+            # Find all unique PR/issue numbers referenced in the summary
+            pr_numbers = set(re.findall(r"#(\d+)", summary))
+
+            # Replace each occurrence exactly once so we don't wrap already-linked numbers
+            for pr_number in pr_numbers:
+                summary = summary.replace(
+                    f"#{pr_number}",
+                    f"[#{pr_number}](https://github.com/PaperMC/{self.project}/issues/{pr_number})",
+                )
             return_string += f"- [{commit_hash}](https://github.com/PaperMC/{self.project}/commit/{full_hash}) {summary}\n"
         return return_string
+    
+    def get_latest_build(self):
+        query = latest_query
+        variables = {"project": self.project}
+        result = client.execute(query, variable_values=variables)
+        return result
 
-    def send_v2_webhook(self, hook_url, latest_build, latest_version, build_time, image_url, changes, download_url, drama):
+    def send_v2_webhook(self, hook_url, latest_build, latest_version, build_time, image_url, changes, download_url, drama, channel_name):
         payload = {
             "components": [
                 {
@@ -215,7 +170,7 @@ class PaperAPI:
                                 },
                                 {
                                     "type": 10,
-                                    "content": f"Build {latest_build} for {latest_version} is now available!\nReleased <t:{build_time}:R> (<t:{build_time}:f>)",
+                                    "content": f"{channel_name} Build {latest_build} for {latest_version} is now available!\nReleased <t:{build_time}:R> (<t:{build_time}:f>)",
                                 },
                             ],
                             "accessory": {
@@ -265,123 +220,42 @@ class PaperAPI:
             params={"with_components": "true"}
         )
 
-    def run(self, restart_on_build=False):
+    def run(self):
         current_time = dt.now()
         print(f"[{current_time}] ", end="")
-        latest_version = self.get_latest_minecraft_version()
-        latest_build = self.get_latest_build_for_version(latest_version)
-        updated = self.up_to_date(latest_version, latest_build)
-        if not updated:
-            print(f"New build. Sending update for {self.project}.")
-            # Write the latest version and build to the json file
-            self.write_to_json(latest_version, latest_build)
-            build_info = self.get_build_info(latest_version, latest_build)
-            changes = self.get_changes_for_build(build_info)
-            download_url = self.construct_download_url(latest_version, latest_build, build_info)
-            build_time = int(convert_build_date(build_info["time"]).timestamp())
-            # Create a new webhook
-            for hook in webhook_urls:
-                drama = get_spigot_drama()
-                if not CONFIG["use_components_v2"]:
-                    webhook = DiscordWebhook(url=hook, rate_limit_retry=True)
-                    # Create a new embed
-                    embed = DiscordEmbed(
-                        title=f"{self.project.capitalize()} Update",
-                        description=f"Build {latest_build} for {latest_version} is now available!",
-                        color=0x00FF00,
+        try:
+            gql_latest_build = self.get_latest_build()
+            latest_version = gql_latest_build["project"]["versions"][0]["id"]
+            latest_build = gql_latest_build["project"]["versions"][0]["builds"][0]["id"]
+            latest_build_info = gql_latest_build["project"]["versions"][0]["builds"][0]
+            updated = self.up_to_date(latest_version, latest_build)
+            if not updated:
+                print(f"New build. Sending update for {self.project}.")
+                # Write the latest version and build to the json file
+                self.write_to_json(latest_version, latest_build)
+                changes = self.get_changes_for_build(latest_build_info)
+                download_url = latest_build_info["download"]["url"]
+                build_time = int(convert_build_date(latest_build_info["time"]).timestamp())
+                # Create a new webhook
+                for hook in webhook_urls:
+                    drama = get_spigot_drama()
+                    # Otherwise we have to hand roll it since there's no library support for components v2
+                    self.send_v2_webhook(
+                        hook_url=hook,
+                        latest_build=latest_build,
+                        latest_version=latest_version,
+                        build_time=build_time,
+                        image_url=self.image_url,
+                        changes=changes,
+                        download_url=download_url,
+                        drama=drama,
+                        channel_name=gql_latest_build["project"]["versions"][0]["builds"][0]["channel"].capitalize()
                     )
-                    # Add the latest build to the embed
-                    if self.project == "paper":
-                        embed.set_author(
-                            name="Paper",
-                            url="https://papermc.io/",
-                            icon_url=self.image_url,
-                        )
-                    elif self.project == "folia":
-                        embed.set_author(
-                            name="Folia",
-                            url="https://papermc.io/",
-                            icon_url=self.image_url,
-                        )
-                    elif self.project == "velocity":
-                        embed.set_author(
-                            name="Velocity",
-                            url="https://papermc.io/",
-                            icon_url=self.image_url,
-                        )
-                    else:
-                        embed.set_author(
-                            name=self.project.capitalize(), url="https://papermc.io/"
-                        )
-                    # embed.add_embed_field(name="Build", value=latest_build, inline=True)
-                    # embed.add_embed_field(name="Version", value=latest_version, inline=True)
-                    embed.add_embed_field(
-                        name="Link",
-                        value=download_url,
-                        inline=False,
-                    )
-                    # embed.add_embed_field(name="sha256", value=build_info["downloads"]["application"]["sha256"], inline=False)
-                    embed.add_embed_field(
-                        name="Changes",
-                        value=changes,
-                        inline=False,
-                    )
-                    # embed.add_embed_field(name="Build Channel", value=build_info["channel"], inline=False)
-                    # Timestamp
-                    embed.set_timestamp(
-                        build_time
-                    )
-                    # Set a footer to link to the site to add this webhook
-                    
-                    embed.set_footer(text=drama["response"])
-                    webhook.add_embed(embed)
-                    # Send the webhook
-                    webhook.execute()
-                    continue
-                # Otherwise we have to hand roll it since there's no library support for components v2
-                self.send_v2_webhook(
-                    hook_url=hook,
-                    latest_build=latest_build,
-                    latest_version=latest_version,
-                    build_time=build_time,
-                    image_url=self.image_url,
-                    changes=changes,
-                    download_url=download_url,
-                    drama=drama
-                )
-
-            # Restart the server if enabled
-            if CONFIG["enable_pterodactyl"] and restart_on_build:
-                try:
-                    print("Restarting server")
-                    if CONFIG["pterodactyl_schedule_id"]:
-                        # Check to make sure we're not already rebooting
-                        processing = api.client.servers.schedules.get_schedule_details(
-                            CONFIG["pterodactyl_server_id"],
-                            CONFIG["pterodactyl_schedule_id"],
-                        )["attributes"]["is_processing"]
-                        if not processing:
-                            api.client.servers.schedules.run_schedule(
-                                CONFIG["pterodactyl_server_id"],
-                                CONFIG["pterodactyl_schedule_id"],
-                            )
-                        else:
-                            print("Skipping schedule since it's currently processing")
-                    else:
-                        # Check if state is running before restarting
-                        state = api.client.servers.get_server_utilization(
-                            CONFIG["pterodactyl_server_id"]
-                        )["current_state"]
-                        if state == "running":
-                            api.client.servers.send_power_action(
-                                CONFIG["pterodactyl_server_id"], "restart"
-                            )
-                        else:
-                            print("Server is not running, skipping restart")
-                except Exception as e:
-                    print(f"Error restarting server: {e}")
-        else:
-            print(f"Up to date for {self.project}")
+            else:
+                print(f"Up to date for {self.project}")
+        except KeyError as e:
+            print(f"Error getting latest build: {e}")
+            return
 
 
 def main():
@@ -390,7 +264,7 @@ def main():
         lock = FileLock(lock_file, timeout=10)
         with lock:
             paper = PaperAPI()
-            paper.run(restart_on_build=True)
+            paper.run()
             folia = PaperAPI(project="folia")
             folia.run()
             velocity = PaperAPI(project="velocity")

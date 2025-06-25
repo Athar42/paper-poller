@@ -1,4 +1,3 @@
 requests
-discord-webhook
 python-dotenv
-py-dactyl
+gql[all]
