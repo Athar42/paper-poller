@@ -122,9 +122,17 @@ class PaperAPI:
             return True
         else:
             return False
+        
+    def get_stored_data(self):
+        try:
+            with open(f"{self.project}_poller.json", "r") as f:
+                data = json.load(f)
+        except FileNotFoundError:
+            data = {"version": "", "build": "", "channel": ""}
+        return data
 
-    def write_to_json(self, version, build):
-        data = {"version": version, "build": build}
+    def write_to_json(self, version, build, channel_name):
+        data = {"version": version, "build": build, "channel": channel_name}
         with open(f"{self.project}_poller.json", "w") as f:
             json.dump(data, f)
 
@@ -154,7 +162,7 @@ class PaperAPI:
         result = client.execute(query, variable_values=variables)
         return result
 
-    def send_v2_webhook(self, hook_url, latest_build, latest_version, build_time, image_url, changes, download_url, drama, channel_name):
+    def send_v2_webhook(self, hook_url, latest_build, latest_version, build_time, image_url, changes, download_url, drama, channel_name, channel_changed):
         payload = {
             "components": [
                 {
@@ -213,6 +221,13 @@ class PaperAPI:
             "flags": 1 << 15,
             "allowed_mentions": {"parse": []}
         }
+        # If the channel changed, add another container to the components
+        if channel_changed:
+            changed_container = {
+                "type": 10,
+                "content": f"# {self.project.capitalize()} is now {channel_name}!"
+            }
+            payload["components"].append(changed_container)
         # Then do a post to the webhook with ?with_components=true
         requests.post(
             hook_url,
@@ -228,11 +243,14 @@ class PaperAPI:
             latest_version = gql_latest_build["project"]["versions"][0]["id"]
             latest_build = gql_latest_build["project"]["versions"][0]["builds"][0]["id"]
             latest_build_info = gql_latest_build["project"]["versions"][0]["builds"][0]
+            channel_name = gql_latest_build["project"]["versions"][0]["builds"][0]["channel"]
             updated = self.up_to_date(latest_version, latest_build)
+            stored_data = self.get_stored_data()
+            channel_changed = stored_data.get("channel", None) is not None and stored_data.get("channel", "") != channel_name
             if not updated:
                 print(f"New build. Sending update for {self.project}.")
                 # Write the latest version and build to the json file
-                self.write_to_json(latest_version, latest_build)
+                self.write_to_json(latest_version, latest_build, channel_name)
                 changes = self.get_changes_for_build(latest_build_info)
                 download_url = latest_build_info["download"]["url"]
                 build_time = int(convert_build_date(latest_build_info["time"]).timestamp())
@@ -249,7 +267,8 @@ class PaperAPI:
                         changes=changes,
                         download_url=download_url,
                         drama=drama,
-                        channel_name=gql_latest_build["project"]["versions"][0]["builds"][0]["channel"].capitalize()
+                        channel_name=channel_name.capitalize(),
+                        channel_changed=channel_changed
                     )
             else:
                 print(f"Up to date for {self.project}")
