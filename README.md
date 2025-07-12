@@ -1,6 +1,138 @@
-# paper-poller
-A simple Python script to check the Paper API for updates and announce them on Discord.
+# Paper Poller
+
+A Python script that monitors PaperMC projects (Paper, Folia, Velocity, Waterfall) for new builds and automatically announces them on Discord with rich embeds.
+
+## Features
+
+- **Multi-Project Support**: Monitors Paper, Folia, Velocity, and Waterfall builds
+- **Rich Discord Embeds**: Beautiful embeds with project logos, build information, and download links
+- **Change Tracking**: Displays commit changes and links to GitHub issues/PRs
+- **Channel Detection**: Automatically detects and announces channel changes (e.g., from experimental to recommended)
+- **Spigot Drama Integration**: Includes fun "drama" messages from the Spigot community
+- **Rate Limiting**: Built-in protection against Discord API rate limits
+- **File Locking**: Prevents multiple instances from running simultaneously
+- **Flexible Configuration**: Support for environment variables, JSON files, and stdin input
+
+## Installation
+
+1. Clone this repository:
+```bash
+git clone https://github.com/yourusername/paper-poller.git
+cd paper-poller
+```
+
+2. Install dependencies:
+```bash
+pip install -r requirements.txt
+```
+
+## Configuration
+
+### Method 1: Environment Variables
+Set the `WEBHOOK_URL` environment variable with a JSON array of Discord webhook URLs:
+```bash
+export WEBHOOK_URL='["https://discord.com/api/webhooks/your-webhook-url"]'
+```
+
+### Method 2: JSON File
+Create a `webhooks.json` file in the project directory:
+```json
+{
+    "urls": [
+        "https://discord.com/api/webhooks/your-webhook-url"
+    ]
+}
+```
+
+### Method 3: Stdin Input
+Pass webhook URLs through stdin with the `--stdin` flag:
+```bash
+echo '{"urls": ["https://discord.com/api/webhooks/your-webhook-url"]}' | python paper-poller.py --stdin
+```
 
 ## Usage
-You can either specify URLs inside of the python file itself or pass in a JSON object containing an array called `urls` through stdin.
+
+### Basic Usage
+Run the script to check for updates on all supported projects:
+```bash
+python paper-poller.py
+```
+
+### With Stdin Input
+```bash
+echo '{"urls": ["your-webhook-url"]}' | python paper-poller.py --stdin
+```
+
+### Cron Job Setup
+To run the script periodically, add it to your crontab:
+```bash
+# Check for updates every 10 minutes
+*/10 * * * * cd /path/to/paper-poller && python paper-poller.py
+```
+
+## What It Monitors
+
+The script automatically monitors these PaperMC projects:
+- **Paper**: The main Minecraft server software
+- **Folia**: Multi-threaded Minecraft server software
+- **Velocity**: Modern proxy for Minecraft servers
+- **Waterfall**: BungeeCord fork for Minecraft servers
+
+## Discord Output
+
+The script sends rich Discord embeds containing:
+- Project logo and branding
+- Build version and number
+- Release timestamp (relative and absolute)
+- List of commit changes with GitHub links
+- Download button linking to the build
+- Fun "drama" messages from the Spigot community
+- Channel change notifications when applicable
+
+## File Structure
+
+```
+paper-poller/
+├── paper-poller.py          # Main script
+├── requirements.txt          # Python dependencies
+├── webhooks.example.json    # Example webhook configuration
+├── {project}_poller.json    # State files for each project (auto-generated)
+└── paper_poller.lock        # Lock file to prevent concurrent runs
+```
+
+## Dependencies
+
+- `requests`: HTTP requests for API calls
+- `python-dotenv`: Environment variable loading
+- `gql[all]`: GraphQL client for PaperMC API
+- `filelock`: File locking to prevent concurrent execution
+
+## State Management
+
+The script maintains state files for each project (`paper_poller.json`, `folia_poller.json`, etc.) to track:
+- Latest version seen
+- Latest build number
+- Current channel (experimental, recommended, etc.)
+
+This prevents duplicate notifications and enables channel change detection.
+
+## Error Handling
+
+- Graceful handling of API failures
+- File locking prevents multiple instances
+- Rate limiting protects against Discord API limits
+- Comprehensive error logging
+
+## Contributing
+
+Feel free to submit issues and pull requests to improve the project!
+
+## Discord Community
+
+Join our Discord community for support and discussions:
+[Paper Chan Discord](https://paper-chan.moe/discord)
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
