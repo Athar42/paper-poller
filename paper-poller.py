@@ -20,11 +20,14 @@ headers = {
 
 # Check the ENV for a webhook URL
 if os.getenv("WEBHOOK_URL"):
+    print(f"Using webhook URL from ENV: {os.getenv('WEBHOOK_URL')}")
     webhook_urls = json.loads(os.getenv("WEBHOOK_URL"))
 elif os.path.exists("webhooks.json"):
+    print(f"Using webhook URL from webhooks.json")
     with open("webhooks.json", "r") as f:
         webhook_urls = json.load(f)["urls"]
 else:
+    print("No webhook URL found, using default")
     webhook_urls = ["url.here"]
 
 # Get start args
