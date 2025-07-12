@@ -8,6 +8,7 @@ from filelock import Timeout, FileLock
 import re
 from gql import gql, Client
 from gql.transport.requests import RequestsHTTPTransport
+import time
 
 load_dotenv()
 
@@ -106,9 +107,9 @@ class PaperAPI:
         if self.project == "paper":
             self.image_url = "https://assets.papermc.io/brand/papermc_logo.512.png"
         elif self.project == "folia":
-            self.image_url = "https://cdn.discordapp.com/attachments/1018399544398065725/1092644957849927680/Folia_Logo_200x200.png"
+            self.image_url = "https://assets.papermc.io/brand/folia_logo.256x139.png"
         elif self.project == "velocity":
-            self.image_url = "https://cdn.discordapp.com/attachments/1022538177908592681/1365376228843851799/velocity_logo_blue.min.png"
+            self.image_url = "https://assets.papermc.io/brand/velocity_logo.256x128.png"
 
     def up_to_date(self, version, build) -> bool:
         # Read out {project}_poller.json file
@@ -142,8 +143,10 @@ class PaperAPI:
             commit_hash = convert_commit_hash_to_short(change["sha"])
             full_hash = change["sha"]
             summary = change["message"]
-            # remove any newlines from the summary
-            summary = summary.replace("\n", " ")
+            summary = summary.strip()
+            # summary = "Update DataConverter constants for 1.21.7\n\nhttps://github.com/PaperMC/DataConverter/commit/04b08a102a3d2473420edceed05420b5ccb3b771\n"
+            # Replace the first \n\n with \n\t, then all others with \n
+            summary = summary.split("\n")[0]
             # Find all unique PR/issue numbers referenced in the summary
             pr_numbers = set(re.findall(r"#(\d+)", summary))
 
@@ -275,6 +278,9 @@ class PaperAPI:
         except KeyError as e:
             print(f"Error getting latest build: {e}")
             return
+        finally:
+            # Wait 2 seconds to not hit discord API rate limits
+            time.sleep(2)
 
 
 def main():
