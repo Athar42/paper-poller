@@ -1,5 +1,7 @@
 # Paper Poller
 
+# Fork created to remove the "Drama" message (which can failed to be retrieved).
+
 A Python script that monitors PaperMC projects (Paper, Folia, Velocity, Waterfall) for new builds and automatically announces them on Discord with rich embeds.
 
 ## Features
@@ -8,7 +10,6 @@ A Python script that monitors PaperMC projects (Paper, Folia, Velocity, Waterfal
 - **Rich Discord Embeds**: Beautiful embeds with project logos, build information, and download links
 - **Change Tracking**: Displays commit changes and links to GitHub issues/PRs
 - **Channel Detection**: Automatically detects and announces channel changes (e.g., from experimental to recommended)
-- **Spigot Drama Integration**: Includes fun "drama" messages from the Spigot community
 - **Rate Limiting**: Built-in protection against Discord API rate limits
 - **File Locking**: Prevents multiple instances from running simultaneously
 - **Flexible Configuration**: Support for environment variables, JSON files, and stdin input
