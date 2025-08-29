@@ -191,10 +191,6 @@ class PaperAPI:
                         {
                             "type": 10,
                             "content": changes
-                        },
-                        {
-                            "type": 14,
-                            "divider": True
                         }
                     ]
                 },
