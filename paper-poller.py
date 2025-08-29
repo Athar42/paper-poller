@@ -87,16 +87,6 @@ def convert_build_date(date):
     return dt.strptime(date, "%Y-%m-%dT%H:%M:%S.%f%z")
 
 
-def get_spigot_drama() -> str | dict:
-    try:
-        response = requests.get("https://drama.mart.fyi/api", headers=headers)
-        data = response.json()
-        return data
-    except Exception as e:
-        print(f"Error getting spigot drama: {e}")
-        return "There's no drama :("
-
-
 class PaperAPI:
     def __init__(self, base_url="https://api.papermc.io/v2", project="paper"):
         self.headers = {
@@ -168,7 +158,7 @@ class PaperAPI:
         result = client.execute(query, variable_values=variables)
         return result
 
-    def send_v2_webhook(self, hook_url, latest_build, latest_version, build_time, image_url, changes, download_url, drama, channel_name, channel_changed):
+    def send_v2_webhook(self, hook_url, latest_build, latest_version, build_time, image_url, changes, download_url, channel_name, channel_changed):
         payload = {
             "components": [
                 {
@@ -205,10 +195,6 @@ class PaperAPI:
                         {
                             "type": 14,
                             "divider": True
-                        },
-                        {
-                            "type": 10,
-                            "content": f"-# {drama['response']}"
                         }
                     ]
                 },
@@ -262,7 +248,6 @@ class PaperAPI:
                 build_time = int(convert_build_date(latest_build_info["time"]).timestamp())
                 # Create a new webhook
                 for hook in webhook_urls:
-                    drama = get_spigot_drama()
                     # Otherwise we have to hand roll it since there's no library support for components v2
                     self.send_v2_webhook(
                         hook_url=hook,
@@ -272,7 +257,6 @@ class PaperAPI:
                         image_url=self.image_url,
                         changes=changes,
                         download_url=download_url,
-                        drama=drama,
                         channel_name=channel_name.capitalize(),
                         channel_changed=channel_changed
                     )
