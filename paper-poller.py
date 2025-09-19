@@ -9,6 +9,7 @@ import re
 from gql import gql, Client
 from gql.transport.requests import RequestsHTTPTransport
 import time
+from enum import Enum
 
 load_dotenv()
 
@@ -19,6 +20,26 @@ CHECK_ALL_VERSIONS = os.getenv("PAPER_POLLER_CHECK_ALL_VERSIONS", "false").lower
 # Configuration: Dry run mode - process updates but don't send webhooks
 # Set PAPER_POLLER_DRY_RUN=true to enable dry run mode
 DRY_RUN = os.getenv("PAPER_POLLER_DRY_RUN", "false").lower() == "true"
+
+
+class Color(Enum):
+    BLUE = 0x4fc3f7
+    GREEN = 0x4db6ac
+    PINK = 0xf06292
+    ORANGE = 0xffb74d
+    PURPLE = 0x7e57c2
+    RED = 0xff6f61
+    YELLOW = 0xfff176
+
+
+COLORS = {color.name.lower(): color.value for color in Color}
+
+CHANNEL_COLORS = {
+    "ALPHA": Color.RED.value,
+    "BETA": Color.YELLOW.value,
+    "STABLE": Color.BLUE.value,
+    "RECOMMENDED": Color.GREEN.value,
+}
 
 headers = {
     "User-Agent": "PaperMC Version Poller",
@@ -277,7 +298,7 @@ class PaperAPI:
             "components": [
                 {
                     "type": 17,
-                    "accent_color": 0x00FF00,
+                    "accent_color": CHANNEL_COLORS[channel_name.upper()],
                     "components": [
                         {
                             "type": 9,
