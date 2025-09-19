@@ -12,6 +12,14 @@ import time
 
 load_dotenv()
 
+# Configuration: Check all versions or just the latest
+# Set PAPER_POLLER_CHECK_ALL_VERSIONS=true to enable multi-version checking
+CHECK_ALL_VERSIONS = os.getenv("PAPER_POLLER_CHECK_ALL_VERSIONS", "false").lower() == "true"
+
+# Configuration: Dry run mode - process updates but don't send webhooks
+# Set PAPER_POLLER_DRY_RUN=true to enable dry run mode
+DRY_RUN = os.getenv("PAPER_POLLER_DRY_RUN", "false").lower() == "true"
+
 headers = {
     "User-Agent": "PaperMC Version Poller",
     "Cache-Control": "no-cache",
@@ -53,6 +61,36 @@ query getLatestBuild($project: String!) {
     project(id: $project) {
         id
         versions(last: 1) {
+            id
+            builds(last: 1) {
+                id
+                download(name: "server:default") {
+                    name
+                    size
+                    url
+                    checksums {
+                        sha256
+                    }
+                }
+                commits {
+                    sha
+                    message
+                }
+                time
+                channel
+            }
+        }
+    }
+}
+"""
+)
+
+all_versions_query = gql(
+    """
+query getAllVersionsWithBuilds($project: String!) {
+    project(id: $project) {
+        id
+        versions {
             id
             builds(last: 1) {
                 id
@@ -126,6 +164,24 @@ class PaperAPI:
             return True
         else:
             return False
+
+    def up_to_date_for_version(self, version, build) -> bool:
+        # Read out {project}_poller.json file to check specific version
+        try:
+            with open(f"{self.project}_poller.json", "r") as f:
+                data = json.load(f)
+        except FileNotFoundError:
+            data = {"versions": {}}
+        
+        # Check if we have versions structure
+        if "versions" not in data:
+            # Legacy format, convert it
+            if "version" in data and "build" in data:
+                return data["version"] == version and data["build"] == build
+            return False
+        
+        version_data = data["versions"].get(version, {})
+        return version_data.get("build") == build
         
     def get_stored_data(self):
         try:
@@ -135,8 +191,50 @@ class PaperAPI:
             data = {"version": "", "build": "", "channel": ""}
         return data
 
+    def get_stored_data_for_version(self, version):
+        try:
+            with open(f"{self.project}_poller.json", "r") as f:
+                data = json.load(f)
+        except FileNotFoundError:
+            data = {"versions": {}}
+        
+        # Check if we have versions structure
+        if "versions" not in data:
+            # Legacy format
+            if "version" in data and data["version"] == version:
+                return {"build": data.get("build", ""), "channel": data.get("channel", "")}
+            return {"build": "", "channel": ""}
+        
+        return data["versions"].get(version, {"build": "", "channel": ""})
+
     def write_to_json(self, version, build, channel_name):
         data = {"version": version, "build": build, "channel": channel_name}
+        with open(f"{self.project}_poller.json", "w") as f:
+            json.dump(data, f)
+
+    def write_version_to_json(self, version, build, channel_name):
+        # Read existing data
+        try:
+            with open(f"{self.project}_poller.json", "r") as f:
+                data = json.load(f)
+        except FileNotFoundError:
+            data = {"versions": {}}
+        
+        # Ensure versions structure exists
+        if "versions" not in data:
+            data = {"versions": {}}
+        
+        # Update the specific version
+        data["versions"][version] = {
+            "build": build,
+            "channel": channel_name
+        }
+        
+        # Keep legacy format for latest version for backward compatibility
+        data["version"] = version
+        data["build"] = build
+        data["channel"] = channel_name
+        
         with open(f"{self.project}_poller.json", "w") as f:
             json.dump(data, f)
 
@@ -164,6 +262,12 @@ class PaperAPI:
     
     def get_latest_build(self):
         query = latest_query
+        variables = {"project": self.project}
+        result = client.execute(query, variable_values=variables)
+        return result
+
+    def get_all_versions(self):
+        query = all_versions_query
         variables = {"project": self.project}
         result = client.execute(query, variable_values=variables)
         return result
@@ -241,43 +345,88 @@ class PaperAPI:
             params={"with_components": "true"}
         )
 
+    def _process_and_send_update(self, version_id, build_info, channel_changed):
+        """Process a build and send webhook updates for it"""
+        build_id = build_info["id"]
+        channel_name = build_info["channel"]
+        
+        if DRY_RUN:
+            print(f"[DRY RUN] New build for {self.project} {version_id}. Would send update (Build {build_id}).")
+            return
+        
+        print(f"New build for {self.project} {version_id}. Sending update.")
+        
+        # Process build information
+        changes = self.get_changes_for_build(build_info)
+        download_url = build_info["download"]["url"]
+        build_time = int(convert_build_date(build_info["time"]).timestamp())
+        
+        # Send webhook to all configured URLs
+        for hook in webhook_urls:
+            drama = get_spigot_drama()
+            self.send_v2_webhook(
+                hook_url=hook,
+                latest_build=build_id,
+                latest_version=version_id,
+                build_time=build_time,
+                image_url=self.image_url,
+                changes=changes,
+                download_url=download_url,
+                drama=drama,
+                channel_name=channel_name.capitalize(),
+                channel_changed=channel_changed
+            )
+
+    def _check_version_for_update(self, version_id, build_info, use_legacy_storage=False):
+        """Check if a version needs an update and process it if so"""
+        build_id = build_info["id"]
+        channel_name = build_info["channel"]
+        
+        if use_legacy_storage:
+            # Use original storage methods for single version mode
+            updated = self.up_to_date(version_id, build_id)
+            stored_data = self.get_stored_data()
+            channel_changed = stored_data.get("channel", None) is not None and stored_data.get("channel", "") != channel_name
+            
+            if not updated:
+                self.write_to_json(version_id, build_id, channel_name)
+                self._process_and_send_update(version_id, build_info, channel_changed)
+                return True
+        else:
+            # Use version-specific storage methods for multi version mode
+            updated = self.up_to_date_for_version(version_id, build_id)
+            stored_version_data = self.get_stored_data_for_version(version_id)
+            channel_changed = stored_version_data.get("channel", None) is not None and stored_version_data.get("channel", "") != channel_name
+            
+            if not updated:
+                self.write_version_to_json(version_id, build_id, channel_name)
+                self._process_and_send_update(version_id, build_info, channel_changed)
+                return True
+        
+        return False
+
     def run(self):
         current_time = dt.now()
         print(f"[{current_time}] ", end="")
+        
+        if CHECK_ALL_VERSIONS:
+            self._run_multi_version_mode()
+        else:
+            self._run_single_version_mode()
+
+    def _run_single_version_mode(self):
+        """Original behavior: check only the latest version"""
         try:
             gql_latest_build = self.get_latest_build()
             latest_version = gql_latest_build["project"]["versions"][0]["id"]
-            latest_build = gql_latest_build["project"]["versions"][0]["builds"][0]["id"]
             latest_build_info = gql_latest_build["project"]["versions"][0]["builds"][0]
-            channel_name = gql_latest_build["project"]["versions"][0]["builds"][0]["channel"]
-            updated = self.up_to_date(latest_version, latest_build)
-            stored_data = self.get_stored_data()
-            channel_changed = stored_data.get("channel", None) is not None and stored_data.get("channel", "") != channel_name
-            if not updated:
-                print(f"New build. Sending update for {self.project}.")
-                # Write the latest version and build to the json file
-                self.write_to_json(latest_version, latest_build, channel_name)
-                changes = self.get_changes_for_build(latest_build_info)
-                download_url = latest_build_info["download"]["url"]
-                build_time = int(convert_build_date(latest_build_info["time"]).timestamp())
-                # Create a new webhook
-                for hook in webhook_urls:
-                    drama = get_spigot_drama()
-                    # Otherwise we have to hand roll it since there's no library support for components v2
-                    self.send_v2_webhook(
-                        hook_url=hook,
-                        latest_build=latest_build,
-                        latest_version=latest_version,
-                        build_time=build_time,
-                        image_url=self.image_url,
-                        changes=changes,
-                        download_url=download_url,
-                        drama=drama,
-                        channel_name=channel_name.capitalize(),
-                        channel_changed=channel_changed
-                    )
-            else:
+            
+            # Check and process update using extracted function
+            update_sent = self._check_version_for_update(latest_version, latest_build_info, use_legacy_storage=True)
+            
+            if not update_sent:
                 print(f"Up to date for {self.project}")
+                
         except KeyError as e:
             print(f"Error getting latest build: {e}")
             return
@@ -285,11 +434,58 @@ class PaperAPI:
             # Wait 2 seconds to not hit discord API rate limits
             time.sleep(2)
 
+    def _run_multi_version_mode(self):
+        """New behavior: check all versions for updates"""
+        try:
+            # Get all versions to check for updates
+            gql_all_versions = self.get_all_versions()
+            all_versions = gql_all_versions["project"]["versions"]
+            
+            updates_sent = 0
+            
+            # Check each version for updates
+            for version_data in all_versions:
+                version_id = version_data["id"]
+                builds = version_data.get("builds", [])
+                
+                # Skip versions with no builds
+                if not builds:
+                    continue
+                
+                build_info = builds[0]
+                
+                # Check and process update using extracted function
+                if self._check_version_for_update(version_id, build_info, use_legacy_storage=False):
+                    updates_sent += 1
+                    # Add small delay between versions to avoid rate limits
+                    time.sleep(1)
+            
+            if updates_sent == 0:
+                print(f"Up to date for all {self.project} versions")
+            else:
+                print(f"Sent {updates_sent} updates for {self.project}")
+                
+        except KeyError as e:
+            print(f"Error getting versions: {e}")
+            return
+        finally:
+            # Wait 2 seconds to not hit discord API rate limits
+            time.sleep(2)
+
 
 def main():
+    lock_file = "paper_poller.lock"
+    lock = FileLock(lock_file, timeout=10)
+    
+    # Show configuration status
+    if DRY_RUN:
+        print("Running in DRY RUN mode - no webhooks will be sent")
+    if CHECK_ALL_VERSIONS:
+        print("Multi-version checking enabled - will check all Minecraft versions")
+    else:
+        print("Single-version checking enabled - will check only the latest version")
+    
     try:
-        lock_file = "paper_poller.lock"
-        lock = FileLock(lock_file, timeout=10)
         with lock:
             paper = PaperAPI()
             paper.run()
@@ -301,6 +497,14 @@ def main():
             waterfall.run()
     except Timeout:
         print("Lock file is locked, exiting")
+    except Exception as e:
+        print(f"Error during execution: {e}")
+    finally:
+        try:
+            if lock.is_locked:
+                lock.release()
+        except Exception:
+            pass
 
 
 if __name__ == "__main__":
