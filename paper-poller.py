@@ -223,10 +223,10 @@ class PaperAPI:
         if "versions" not in data:
             # Legacy format
             if "version" in data and data["version"] == version:
-                return {"build": data.get("build", ""), "channel": data.get("channel", "")}
-            return {"build": "", "channel": ""}
+                return {"build": data.get("build", ""), "channel": data.get("channel", None)}
+            return {"build": "", "channel": None}
         
-        return data["versions"].get(version, {"build": "", "channel": ""})
+        return data["versions"].get(version, {"build": "", "channel": None})
 
     def write_to_json(self, version, build, channel_name):
         data = {"version": version, "build": build, "channel": channel_name}
