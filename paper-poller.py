@@ -10,6 +10,7 @@ from gql import gql, Client
 from gql.transport.requests import RequestsHTTPTransport
 import time
 from enum import Enum
+import urllib.parse
 
 load_dotenv()
 
@@ -278,7 +279,10 @@ class PaperAPI:
                     f"#{pr_number}",
                     f"[#{pr_number}](https://github.com/PaperMC/{self.project}/issues/{pr_number})",
                 )
-            return_string += f"- [{commit_hash}](https://github.com/PaperMC/{self.project}/commit/{full_hash}) {summary}\n"
+            github_url = f"https://github.com/PaperMC/{self.project}/commit/{full_hash}"
+            # URL encode the github_url
+            github_url = urllib.parse.quote(github_url)
+            return_string += f"- [{commit_hash}](https://diffs.dev/?github_url={github_url}) {summary}\n"
         return return_string
     
     def get_latest_build(self):
