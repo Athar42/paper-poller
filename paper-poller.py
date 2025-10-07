@@ -24,13 +24,13 @@ DRY_RUN = os.getenv("PAPER_POLLER_DRY_RUN", "false").lower() == "true"
 
 
 class Color(Enum):
-    BLUE = 0x4fc3f7
-    GREEN = 0x4db6ac
+    BLUE = 0x2b7fff
+    GREEN = 0x4ecb8b
     PINK = 0xf06292
     ORANGE = 0xffb74d
     PURPLE = 0x7e57c2
-    RED = 0xff6f61
-    YELLOW = 0xfff176
+    RED = 0xea5b6f
+    YELLOW = 0xffc859
 
 
 COLORS = {color.name.lower(): color.value for color in Color}
