@@ -1,10 +1,11 @@
 """Pytest configuration and fixtures for paper-poller tests."""
 
-import pytest
 import json
 import os
 from datetime import datetime
-from unittest.mock import Mock, MagicMock
+from unittest.mock import MagicMock, Mock
+
+import pytest
 
 
 @pytest.fixture
@@ -17,21 +18,19 @@ def sample_build_info():
             "name": "paper-1.21.1-123.jar",
             "size": 50000000,
             "url": "https://api.papermc.io/v2/projects/paper/versions/1.21.1/builds/123/downloads/paper-1.21.1-123.jar",
-            "checksums": {
-                "sha256": "abcdef1234567890"
-            }
+            "checksums": {"sha256": "abcdef1234567890"},
         },
         "commits": [
             {
                 "sha": "abc123def456789",
-                "message": "Fix #1234 - Update DataConverter constants"
+                "message": "Fix #1234 - Update DataConverter constants",
             },
             {
                 "sha": "def456abc123789",
-                "message": "Improve performance for chunk loading"
-            }
+                "message": "Improve performance for chunk loading",
+            },
         ],
-        "time": "2025-10-12T12:00:00.000Z"
+        "time": "2025-10-12T12:00:00.000Z",
     }
 
 
@@ -52,21 +51,19 @@ def sample_latest_build_response():
                                 "name": "paper-1.21.1-123.jar",
                                 "size": 50000000,
                                 "url": "https://api.papermc.io/v2/projects/paper/versions/1.21.1/builds/123/downloads/paper-1.21.1-123.jar",
-                                "checksums": {
-                                    "sha256": "abcdef1234567890"
-                                }
+                                "checksums": {"sha256": "abcdef1234567890"},
                             },
                             "commits": [
                                 {
                                     "sha": "abc123def456789",
-                                    "message": "Fix #1234 - Update DataConverter"
+                                    "message": "Fix #1234 - Update DataConverter",
                                 }
                             ],
-                            "time": "2025-10-12T12:00:00.000Z"
+                            "time": "2025-10-12T12:00:00.000Z",
                         }
-                    ]
+                    ],
                 }
-            ]
+            ],
         }
     }
 
@@ -88,19 +85,17 @@ def sample_all_versions_response():
                                 "name": "paper-1.21.1-123.jar",
                                 "size": 50000000,
                                 "url": "https://api.papermc.io/v2/projects/paper/versions/1.21.1/builds/123/downloads/paper-1.21.1-123.jar",
-                                "checksums": {
-                                    "sha256": "abcdef1234567890"
-                                }
+                                "checksums": {"sha256": "abcdef1234567890"},
                             },
                             "commits": [
                                 {
                                     "sha": "abc123def456789",
-                                    "message": "Fix #1234 - Update DataConverter"
+                                    "message": "Fix #1234 - Update DataConverter",
                                 }
                             ],
-                            "time": "2025-10-12T12:00:00.000Z"
+                            "time": "2025-10-12T12:00:00.000Z",
                         }
-                    ]
+                    ],
                 },
                 {
                     "id": "1.21",
@@ -112,25 +107,20 @@ def sample_all_versions_response():
                                 "name": "paper-1.21-120.jar",
                                 "size": 49000000,
                                 "url": "https://api.papermc.io/v2/projects/paper/versions/1.21/builds/120/downloads/paper-1.21-120.jar",
-                                "checksums": {
-                                    "sha256": "123456abcdef"
-                                }
+                                "checksums": {"sha256": "123456abcdef"},
                             },
                             "commits": [
                                 {
                                     "sha": "xyz789abc456",
-                                    "message": "Performance improvements"
+                                    "message": "Performance improvements",
                                 }
                             ],
-                            "time": "2025-10-11T12:00:00.000Z"
+                            "time": "2025-10-11T12:00:00.000Z",
                         }
-                    ]
+                    ],
                 },
-                {
-                    "id": "1.20.6",
-                    "builds": []
-                }
-            ]
+                {"id": "1.20.6", "builds": []},
+            ],
         }
     }
 
@@ -139,18 +129,20 @@ def sample_all_versions_response():
 def mock_gql_client(mocker):
     """Mock GQL client for testing."""
     mock_client = MagicMock()
-    mocker.patch('paper_poller.client', mock_client)
+    mocker.patch("paper_poller.client", mock_client)
     return mock_client
 
 
 @pytest.fixture
 def temp_json_file(tmp_path):
     """Create a temporary JSON file for testing file operations."""
+
     def _create_json_file(filename, data):
         filepath = tmp_path / filename
-        with open(filepath, 'w') as f:
+        with open(filepath, "w") as f:
             json.dump(data, f)
         return filepath
+
     return _create_json_file
 
 
@@ -166,7 +158,7 @@ def clean_env(monkeypatch):
 @pytest.fixture
 def mock_webhook_response(mocker):
     """Mock requests.post for webhook testing."""
-    mock_post = mocker.patch('requests.post')
+    mock_post = mocker.patch("requests.post")
     mock_post.return_value.status_code = 200
     return mock_post
 
@@ -174,6 +166,4 @@ def mock_webhook_response(mocker):
 @pytest.fixture
 def sample_spigot_drama():
     """Sample spigot drama response."""
-    return {
-        "response": "There's no drama :("
-    }
+    return {"response": "There's no drama :("}

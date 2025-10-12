@@ -4,32 +4,32 @@ Paper Poller - A bot for monitoring PaperMC project builds.
 This is a convenience module that imports from the main script.
 """
 
-# Import everything from the main script
-import sys
-import os
-
 # Import the main script
 import importlib.util
+import os
+# Import everything from the main script
+import sys
 
-spec = importlib.util.spec_from_file_location("paper_poller_main",
-                                               os.path.join(os.path.dirname(__file__), "paper-poller.py"))
+spec = importlib.util.spec_from_file_location(
+    "paper_poller_main", os.path.join(os.path.dirname(__file__), "paper-poller.py")
+)
 paper_poller_main = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(paper_poller_main)
 
 # Export all public items
 __all__ = [
-    'PaperAPI',
-    'convert_commit_hash_to_short',
-    'convert_build_date',
-    'get_spigot_drama',
-    'Color',
-    'COLORS',
-    'CHANNEL_COLORS',
-    'CHECK_ALL_VERSIONS',
-    'DRY_RUN',
-    'webhook_urls',
-    'client',
-    'main'
+    "PaperAPI",
+    "convert_commit_hash_to_short",
+    "convert_build_date",
+    "get_spigot_drama",
+    "Color",
+    "COLORS",
+    "CHANNEL_COLORS",
+    "CHECK_ALL_VERSIONS",
+    "DRY_RUN",
+    "webhook_urls",
+    "client",
+    "main",
 ]
 
 # Make everything available at module level

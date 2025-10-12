@@ -1,17 +1,19 @@
 """Unit tests for utility functions in paper-poller."""
 
-import pytest
-from datetime import datetime, timezone
-import sys
 import os
+import sys
+from datetime import datetime, timezone
+
+import pytest
 
 # Add parent directory to path to import the module
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 # We need to set env vars before importing the module
 os.environ.setdefault("WEBHOOK_URL", '["http://example.com"]')
 
-from paper_poller import convert_commit_hash_to_short, convert_build_date, Color, COLORS, CHANNEL_COLORS
+from paper_poller import (CHANNEL_COLORS, COLORS, Color, convert_build_date,
+                          convert_commit_hash_to_short)
 
 
 class TestConvertCommitHashToShort:
@@ -66,19 +68,19 @@ class TestColorEnums:
 
     def test_color_enum_values(self):
         """Test that Color enum has correct hex values."""
-        assert Color.BLUE.value == 0x2b7fff
-        assert Color.GREEN.value == 0x4ecb8b
-        assert Color.PINK.value == 0xf06292
-        assert Color.ORANGE.value == 0xffb74d
-        assert Color.PURPLE.value == 0x7e57c2
-        assert Color.RED.value == 0xea5b6f
-        assert Color.YELLOW.value == 0xffc859
+        assert Color.BLUE.value == 0x2B7FFF
+        assert Color.GREEN.value == 0x4ECB8B
+        assert Color.PINK.value == 0xF06292
+        assert Color.ORANGE.value == 0xFFB74D
+        assert Color.PURPLE.value == 0x7E57C2
+        assert Color.RED.value == 0xEA5B6F
+        assert Color.YELLOW.value == 0xFFC859
 
     def test_colors_dict_mapping(self):
         """Test that COLORS dict maps lowercase names to values."""
-        assert COLORS["blue"] == 0x2b7fff
-        assert COLORS["green"] == 0x4ecb8b
-        assert COLORS["red"] == 0xea5b6f
+        assert COLORS["blue"] == 0x2B7FFF
+        assert COLORS["green"] == 0x4ECB8B
+        assert COLORS["red"] == 0xEA5B6F
         assert len(COLORS) == 7
 
     def test_channel_colors_mapping(self):
@@ -96,6 +98,7 @@ class TestEnvironmentConfiguration:
         """Test that CHECK_ALL_VERSIONS defaults to False."""
         # Need to re-import with clean env
         import importlib
+
         import paper_poller as pp
 
         # The module was already imported, so we check the value
@@ -105,4 +108,5 @@ class TestEnvironmentConfiguration:
     def test_dry_run_default(self):
         """Test that DRY_RUN defaults to False."""
         import paper_poller as pp
+
         assert pp.DRY_RUN in [True, False]

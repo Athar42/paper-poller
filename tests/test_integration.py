@@ -1,30 +1,38 @@
 """Integration tests for paper-poller with mocked API responses."""
 
-import pytest
 import json
 import os
 import sys
-from unittest.mock import Mock, patch, MagicMock
 import time
+from unittest.mock import MagicMock, Mock, patch
+
+import pytest
+
+from paper_poller import PaperAPI
 
 # Add parent directory to path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 # Set env vars before import
 os.environ.setdefault("WEBHOOK_URL", '["http://example.com"]')
 os.environ["PAPER_POLLER_DRY_RUN"] = "false"
 os.environ["PAPER_POLLER_CHECK_ALL_VERSIONS"] = "false"
 
-from paper_poller import PaperAPI
-
 
 class TestSingleVersionMode:
     """Integration tests for single version mode."""
 
-    @patch('paper_poller.client')
-    @patch('paper_poller.webhook_urls', [])
-    @patch('time.sleep')  # Mock sleep to speed up tests
-    def test_run_single_version_mode_up_to_date(self, mock_sleep, mock_client, tmp_path, monkeypatch, sample_latest_build_response):
+    @patch("paper_poller.client")
+    @patch("paper_poller.webhook_urls", [])
+    @patch("time.sleep")  # Mock sleep to speed up tests
+    def test_run_single_version_mode_up_to_date(
+        self,
+        mock_sleep,
+        mock_client,
+        tmp_path,
+        monkeypatch,
+        sample_latest_build_response,
+    ):
         """Test single version mode when already up to date."""
         monkeypatch.chdir(tmp_path)
 
@@ -41,11 +49,20 @@ class TestSingleVersionMode:
         # Verify no webhook was sent (we check by verifying sleep was called for rate limiting)
         assert mock_sleep.called
 
-    @patch('paper_poller.client')
-    @patch('requests.post')
-    @patch('paper_poller.get_spigot_drama')
-    @patch('time.sleep')
-    def test_run_single_version_mode_new_build(self, mock_sleep, mock_drama, mock_post, mock_client, tmp_path, monkeypatch, sample_latest_build_response):
+    @patch("paper_poller.client")
+    @patch("requests.post")
+    @patch("paper_poller.get_spigot_drama")
+    @patch("time.sleep")
+    def test_run_single_version_mode_new_build(
+        self,
+        mock_sleep,
+        mock_drama,
+        mock_post,
+        mock_client,
+        tmp_path,
+        monkeypatch,
+        sample_latest_build_response,
+    ):
         """Test single version mode when new build is available."""
         monkeypatch.chdir(tmp_path)
 
@@ -72,12 +89,21 @@ class TestSingleVersionMode:
             data = json.load(f)
         assert data["build"] == "123"
 
-    @patch('paper_poller.client')
-    @patch('requests.post')
-    @patch('paper_poller.webhook_urls', ['http://test.webhook.com'])
-    @patch('paper_poller.get_spigot_drama')
-    @patch('time.sleep')
-    def test_run_single_version_mode_channel_change(self, mock_sleep, mock_drama, mock_post, mock_client, tmp_path, monkeypatch, sample_latest_build_response):
+    @patch("paper_poller.client")
+    @patch("requests.post")
+    @patch("paper_poller.webhook_urls", ["http://test.webhook.com"])
+    @patch("paper_poller.get_spigot_drama")
+    @patch("time.sleep")
+    def test_run_single_version_mode_channel_change(
+        self,
+        mock_sleep,
+        mock_drama,
+        mock_post,
+        mock_client,
+        tmp_path,
+        monkeypatch,
+        sample_latest_build_response,
+    ):
         """Test single version mode detects channel changes."""
         monkeypatch.chdir(tmp_path)
 
@@ -95,20 +121,27 @@ class TestSingleVersionMode:
 
         # Verify webhook was sent with channel change
         assert mock_post.call_count == 1
-        payload = mock_post.call_args.kwargs['json']
+        payload = mock_post.call_args.kwargs["json"]
 
         # Check that channel changed notification is in payload
         # Look for content components that might indicate channel change
-        assert len(payload['components']) > 0
+        assert len(payload["components"]) > 0
 
 
 class TestMultiVersionMode:
     """Integration tests for multi-version mode."""
 
-    @patch('paper_poller.client')
-    @patch('paper_poller.webhook_urls', [])
-    @patch('time.sleep')
-    def test_run_multi_version_mode_all_up_to_date(self, mock_sleep, mock_client, tmp_path, monkeypatch, sample_all_versions_response):
+    @patch("paper_poller.client")
+    @patch("paper_poller.webhook_urls", [])
+    @patch("time.sleep")
+    def test_run_multi_version_mode_all_up_to_date(
+        self,
+        mock_sleep,
+        mock_client,
+        tmp_path,
+        monkeypatch,
+        sample_all_versions_response,
+    ):
         """Test multi-version mode when all versions are up to date."""
         monkeypatch.chdir(tmp_path)
 
@@ -126,11 +159,20 @@ class TestMultiVersionMode:
         # Should call sleep for rate limiting
         assert mock_sleep.called
 
-    @patch('paper_poller.client')
-    @patch('requests.post')
-    @patch('paper_poller.get_spigot_drama')
-    @patch('time.sleep')
-    def test_run_multi_version_mode_multiple_updates(self, mock_sleep, mock_drama, mock_post, mock_client, tmp_path, monkeypatch, sample_all_versions_response):
+    @patch("paper_poller.client")
+    @patch("requests.post")
+    @patch("paper_poller.get_spigot_drama")
+    @patch("time.sleep")
+    def test_run_multi_version_mode_multiple_updates(
+        self,
+        mock_sleep,
+        mock_drama,
+        mock_post,
+        mock_client,
+        tmp_path,
+        monkeypatch,
+        sample_all_versions_response,
+    ):
         """Test multi-version mode sends updates for multiple versions."""
         monkeypatch.chdir(tmp_path)
 
@@ -160,10 +202,17 @@ class TestMultiVersionMode:
         assert data["versions"]["1.21.1"]["build"] == "123"
         assert data["versions"]["1.21"]["build"] == "120"
 
-    @patch('paper_poller.client')
-    @patch('paper_poller.webhook_urls', [])
-    @patch('time.sleep')
-    def test_run_multi_version_mode_skips_empty_builds(self, mock_sleep, mock_client, tmp_path, monkeypatch, sample_all_versions_response):
+    @patch("paper_poller.client")
+    @patch("paper_poller.webhook_urls", [])
+    @patch("time.sleep")
+    def test_run_multi_version_mode_skips_empty_builds(
+        self,
+        mock_sleep,
+        mock_client,
+        tmp_path,
+        monkeypatch,
+        sample_all_versions_response,
+    ):
         """Test multi-version mode skips versions with no builds."""
         monkeypatch.chdir(tmp_path)
 
@@ -182,10 +231,19 @@ class TestMultiVersionMode:
 class TestDryRunMode:
     """Integration tests for dry run mode."""
 
-    @patch('paper_poller.client')
-    @patch('requests.post')
-    @patch('time.sleep')
-    def test_dry_run_no_webhooks_sent(self, mock_sleep, mock_post, mock_client, tmp_path, monkeypatch, sample_latest_build_response, capsys):
+    @patch("paper_poller.client")
+    @patch("requests.post")
+    @patch("time.sleep")
+    def test_dry_run_no_webhooks_sent(
+        self,
+        mock_sleep,
+        mock_post,
+        mock_client,
+        tmp_path,
+        monkeypatch,
+        sample_latest_build_response,
+        capsys,
+    ):
         """Test dry run mode doesn't send webhooks."""
         monkeypatch.chdir(tmp_path)
 
@@ -200,13 +258,15 @@ class TestDryRunMode:
         api.get_latest_build = Mock(return_value=sample_latest_build_response)
 
         # Mock _process_and_send_update to simulate dry run behavior
-        original_process = api._process_and_send_update
+        api._process_and_send_update
         process_called = []
 
-        def mock_process(version_id, build_info, channel_changed):
+        def mock_process(version_id, build_info, _channel_changed):
             # Simulate DRY_RUN behavior: print message but don't send webhook
-            print(f"[DRY RUN] New build for {api.project} {version_id}. Would send update (Build {build_info['id']}).")
-            process_called.append((version_id, build_info['id']))
+            print(
+                f"[DRY RUN] New build for {api.project} {version_id}. Would send update (Build {build_info['id']})."
+            )
+            process_called.append((version_id, build_info["id"]))
 
         api._process_and_send_update = mock_process
 
@@ -227,9 +287,11 @@ class TestDryRunMode:
 class TestErrorHandling:
     """Integration tests for error handling."""
 
-    @patch('paper_poller.client')
-    @patch('time.sleep')
-    def test_run_handles_graphql_errors(self, mock_sleep, mock_client, tmp_path, monkeypatch, capsys):
+    @patch("paper_poller.client")
+    @patch("time.sleep")
+    def test_run_handles_graphql_errors(
+        self, mock_sleep, mock_client, tmp_path, monkeypatch, capsys
+    ):
         """Test that run handles GraphQL errors gracefully."""
         monkeypatch.chdir(tmp_path)
 
@@ -247,7 +309,7 @@ class TestErrorHandling:
             api._run_single_version_mode()
             # If we get here, error was caught - that's good
             assert True
-        except KeyError as e:
+        except KeyError:
             # KeyError is expected and caught by the code
             assert True
         except Exception as e:
@@ -262,9 +324,11 @@ class TestErrorHandling:
         # The test is mainly about checking the error doesn't cause data corruption
         assert True
 
-    @patch('paper_poller.client')
-    @patch('time.sleep')
-    def test_run_handles_missing_data(self, mock_sleep, mock_client, tmp_path, monkeypatch, capsys):
+    @patch("paper_poller.client")
+    @patch("time.sleep")
+    def test_run_handles_missing_data(
+        self, mock_sleep, mock_client, tmp_path, monkeypatch, capsys
+    ):
         """Test that run handles missing data in response."""
         monkeypatch.chdir(tmp_path)
 
@@ -283,10 +347,12 @@ class TestErrorHandling:
 class TestCheckVersionForUpdate:
     """Tests for _check_version_for_update method."""
 
-    @patch('requests.post')
-    @patch('paper_poller.webhook_urls', ['http://test.webhook.com'])
-    @patch('paper_poller.get_spigot_drama')
-    def test_check_version_legacy_storage(self, mock_drama, mock_post, tmp_path, monkeypatch, sample_build_info):
+    @patch("requests.post")
+    @patch("paper_poller.webhook_urls", ["http://test.webhook.com"])
+    @patch("paper_poller.get_spigot_drama")
+    def test_check_version_legacy_storage(
+        self, mock_drama, mock_post, tmp_path, monkeypatch, sample_build_info
+    ):
         """Test _check_version_for_update with legacy storage."""
         monkeypatch.chdir(tmp_path)
 
@@ -296,15 +362,19 @@ class TestCheckVersionForUpdate:
         api = PaperAPI()
 
         # Test with new build
-        result = api._check_version_for_update("1.21.1", sample_build_info, use_legacy_storage=True)
+        result = api._check_version_for_update(
+            "1.21.1", sample_build_info, use_legacy_storage=True
+        )
 
         assert result is True
         assert mock_post.call_count == 1
 
-    @patch('requests.post')
-    @patch('paper_poller.webhook_urls', ['http://test.webhook.com'])
-    @patch('paper_poller.get_spigot_drama')
-    def test_check_version_version_specific_storage(self, mock_drama, mock_post, tmp_path, monkeypatch, sample_build_info):
+    @patch("requests.post")
+    @patch("paper_poller.webhook_urls", ["http://test.webhook.com"])
+    @patch("paper_poller.get_spigot_drama")
+    def test_check_version_version_specific_storage(
+        self, mock_drama, mock_post, tmp_path, monkeypatch, sample_build_info
+    ):
         """Test _check_version_for_update with version-specific storage."""
         monkeypatch.chdir(tmp_path)
 
@@ -314,7 +384,9 @@ class TestCheckVersionForUpdate:
         api = PaperAPI()
 
         # Test with new build
-        result = api._check_version_for_update("1.21.1", sample_build_info, use_legacy_storage=False)
+        result = api._check_version_for_update(
+            "1.21.1", sample_build_info, use_legacy_storage=False
+        )
 
         assert result is True
         assert mock_post.call_count == 1

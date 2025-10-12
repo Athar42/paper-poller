@@ -7,7 +7,10 @@ ignore =
     # Ignore tabs
     W191,
     # Ignore blank lines whitespace
-    W293
+    W293,
+    # Line break on ternary
+    W503,
+    E402
 exclude =
     # Ignore our virtual environment
     venv,

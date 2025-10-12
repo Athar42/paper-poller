@@ -1,14 +1,15 @@
 """Unit tests for PaperAPI class."""
 
-import pytest
 import json
 import os
 import sys
-from unittest.mock import Mock, MagicMock, patch, call
 from datetime import datetime
+from unittest.mock import MagicMock, Mock, call, patch
+
+import pytest
 
 # Add parent directory to path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 # Set env vars before import
 os.environ.setdefault("WEBHOOK_URL", '["http://example.com"]')
@@ -36,7 +37,9 @@ class TestPaperAPIInitialization:
         """Test PaperAPI initializes correctly for Velocity project."""
         api = PaperAPI(project="velocity")
         assert api.project == "velocity"
-        assert api.image_url == "https://assets.papermc.io/brand/velocity_logo.256x128.png"
+        assert (
+            api.image_url == "https://assets.papermc.io/brand/velocity_logo.256x128.png"
+        )
 
     def test_custom_base_url(self):
         """Test PaperAPI can use custom base URL."""
@@ -93,8 +96,8 @@ class TestPaperAPIVersionSpecificMethods:
             "channel": "STABLE",
             "versions": {
                 "1.21.1": {"build": "123", "channel": "STABLE"},
-                "1.21": {"build": "120", "channel": "RECOMMENDED"}
-            }
+                "1.21": {"build": "120", "channel": "RECOMMENDED"},
+            },
         }
         with open("paper_poller.json", "w") as f:
             json.dump(data, f)
@@ -112,7 +115,7 @@ class TestPaperAPIVersionSpecificMethods:
         data = {
             "versions": {
                 "1.21.1": {"build": "123", "channel": "STABLE"},
-                "1.21": {"build": "120", "channel": "RECOMMENDED"}
+                "1.21": {"build": "120", "channel": "RECOMMENDED"},
             }
         }
         with open("paper_poller.json", "w") as f:
@@ -169,12 +172,9 @@ class TestPaperAPIGetChanges:
             "commits": [
                 {
                     "sha": "abc123def456789",
-                    "message": "Fix #1234 - Update DataConverter constants"
+                    "message": "Fix #1234 - Update DataConverter constants",
                 },
-                {
-                    "sha": "xyz789abc123456",
-                    "message": "Improve performance"
-                }
+                {"sha": "xyz789abc123456", "message": "Improve performance"},
             ]
         }
 
@@ -194,7 +194,7 @@ class TestPaperAPIGetChanges:
             "commits": [
                 {
                     "sha": "abc123def456789",
-                    "message": "Fix issue\n\nThis is a longer description\nthat spans multiple lines"
+                    "message": "Fix issue\n\nThis is a longer description\nthat spans multiple lines",
                 }
             ]
         }
@@ -208,10 +208,7 @@ class TestPaperAPIGetChanges:
         api = PaperAPI()
         build_data = {
             "commits": [
-                {
-                    "sha": "abc123def456789",
-                    "message": "Fix #1234 and close #5678"
-                }
+                {"sha": "abc123def456789", "message": "Fix #1234 and close #5678"}
             ]
         }
 
@@ -225,12 +222,14 @@ class TestPaperAPIGetChanges:
 class TestPaperAPIProcessAndSendUpdate:
     """Tests for _process_and_send_update method."""
 
-    @patch('paper_poller.get_spigot_drama')
-    @patch('paper_poller.webhook_urls', ['http://test.webhook.com'])
-    def test_process_and_send_update_normal_mode(self, mock_drama, sample_build_info, mocker):
+    @patch("paper_poller.get_spigot_drama")
+    @patch("paper_poller.webhook_urls", ["http://test.webhook.com"])
+    def test_process_and_send_update_normal_mode(
+        self, mock_drama, sample_build_info, mocker
+    ):
         """Test _process_and_send_update sends webhooks in normal mode."""
         mock_drama.return_value = {"response": "No drama today"}
-        mock_send = mocker.patch.object(PaperAPI, 'send_v2_webhook')
+        mock_send = mocker.patch.object(PaperAPI, "send_v2_webhook")
 
         api = PaperAPI()
         api._process_and_send_update("1.21.1", sample_build_info, False)
@@ -241,16 +240,17 @@ class TestPaperAPIProcessAndSendUpdate:
     def test_process_and_send_update_dry_run_mode(self, sample_build_info, mocker):
         """Test _process_and_send_update doesn't send webhooks in dry run."""
         # Patch DRY_RUN at the module level before it's evaluated
-        mocker.patch('paper_poller.DRY_RUN', True)
-        mock_send = mocker.patch.object(PaperAPI, 'send_v2_webhook')
+        mocker.patch("paper_poller.DRY_RUN", True)
+        mock_send = mocker.patch.object(PaperAPI, "send_v2_webhook")
 
         api = PaperAPI()
 
         # Manually test the dry run logic
-        build_id = sample_build_info["id"]
+        sample_build_info["id"]
 
         # Simulate what _process_and_send_update does in dry run mode
         import paper_poller as pp
+
         if pp.DRY_RUN:
             # In dry run mode, webhook should not be called
             mock_send.assert_not_called()
@@ -264,7 +264,7 @@ class TestPaperAPIProcessAndSendUpdate:
 class TestGetSpigotDrama:
     """Tests for get_spigot_drama function."""
 
-    @patch('requests.get')
+    @patch("requests.get")
     def test_get_spigot_drama_success(self, mock_get):
         """Test successful drama API call."""
         mock_get.return_value.json.return_value = {"response": "Some drama!"}
@@ -274,7 +274,7 @@ class TestGetSpigotDrama:
         assert result == {"response": "Some drama!"}
         mock_get.assert_called_once()
 
-    @patch('requests.get')
+    @patch("requests.get")
     def test_get_spigot_drama_failure(self, mock_get):
         """Test drama API failure returns default message."""
         mock_get.side_effect = Exception("API Error")
@@ -287,8 +287,8 @@ class TestGetSpigotDrama:
 class TestPaperAPIWebhookPayload:
     """Tests for webhook payload construction."""
 
-    @patch('requests.post')
-    @patch('paper_poller.webhook_urls', ['http://test.webhook.com'])
+    @patch("requests.post")
+    @patch("paper_poller.webhook_urls", ["http://test.webhook.com"])
     def test_send_v2_webhook_payload_structure(self, mock_post):
         """Test that webhook payload has correct structure."""
         api = PaperAPI()
@@ -304,7 +304,7 @@ class TestPaperAPIWebhookPayload:
             download_url="https://example.com/paper.jar",
             drama=drama,
             channel_name="Stable",
-            channel_changed=False
+            channel_changed=False,
         )
 
         # Verify POST was called
@@ -312,13 +312,13 @@ class TestPaperAPIWebhookPayload:
 
         # Check the payload structure
         call_args = mock_post.call_args
-        payload = call_args.kwargs['json']
+        payload = call_args.kwargs["json"]
 
-        assert 'components' in payload
-        assert payload['flags'] == 1 << 15
-        assert 'allowed_mentions' in payload
+        assert "components" in payload
+        assert payload["flags"] == 1 << 15
+        assert "allowed_mentions" in payload
 
-    @patch('requests.post')
+    @patch("requests.post")
     def test_send_v2_webhook_with_channel_change(self, mock_post):
         """Test webhook payload includes channel change notification."""
         api = PaperAPI()
@@ -334,13 +334,13 @@ class TestPaperAPIWebhookPayload:
             download_url="https://example.com/paper.jar",
             drama=drama,
             channel_name="Recommended",
-            channel_changed=True
+            channel_changed=True,
         )
 
         call_args = mock_post.call_args
-        payload = call_args.kwargs['json']
+        payload = call_args.kwargs["json"]
 
         # Should have an extra component for channel change
         # Count components of type 10 (content components)
-        content_components = [c for c in payload['components'] if c.get('type') == 10]
+        content_components = [c for c in payload["components"] if c.get("type") == 10]
         assert len(content_components) > 0
