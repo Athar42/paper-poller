@@ -100,12 +100,80 @@ paper-poller/
 └── paper_poller.lock        # Lock file to prevent concurrent runs
 ```
 
+## Testing
+
+### Running Tests
+
+The project includes a comprehensive test suite using pytest:
+
+```bash
+# Install test dependencies
+pip install -r requirements.txt
+
+# Run all tests
+pytest
+
+# Run tests with coverage report
+pytest --cov=. --cov-report=html
+
+# Run specific test categories
+pytest -m unit          # Run only unit tests
+pytest -m integration   # Run only integration tests
+
+# Run tests in verbose mode
+pytest -v
+
+# Run a specific test file
+pytest tests/test_paper_api.py
+
+# Run a specific test
+pytest tests/test_paper_api.py::TestPaperAPIInitialization::test_default_initialization
+```
+
+### Test Structure
+
+```
+tests/
+├── conftest.py           # Shared fixtures and test configuration
+├── test_utils.py         # Unit tests for utility functions
+├── test_paper_api.py     # Unit tests for PaperAPI class
+└── test_integration.py   # Integration tests with mocked APIs
+```
+
+### Test Coverage
+
+The tests cover:
+- Utility functions (date conversion, hash shortening, etc.)
+- PaperAPI initialization and configuration
+- State management (JSON file reading/writing)
+- Version tracking (single and multi-version modes)
+- Webhook payload generation
+- Dry run mode
+- Error handling
+- Integration flows with mocked GraphQL responses
+
+### Continuous Integration
+
+Tests run automatically on:
+- Every push to main/develop branches
+- Every pull request
+- Multiple Python versions (3.10, 3.11, 3.12, 3.13)
+- Multiple operating systems (Ubuntu, macOS, Windows)
+
 ## Dependencies
 
 - `requests`: HTTP requests for API calls
 - `python-dotenv`: Environment variable loading
 - `gql[all]`: GraphQL client for PaperMC API
 - `filelock`: File locking to prevent concurrent execution
+
+### Testing Dependencies
+
+- `pytest`: Testing framework
+- `pytest-cov`: Coverage reporting
+- `pytest-mock`: Mocking utilities
+- `responses`: HTTP request mocking
+- `freezegun`: Time mocking
 
 ## State Management
 
