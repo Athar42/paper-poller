@@ -12,8 +12,13 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 # We need to set env vars before importing the module
 os.environ.setdefault("WEBHOOK_URL", '["http://example.com"]')
 
-from paper_poller import (CHANNEL_COLORS, COLORS, Color, convert_build_date,
-                          convert_commit_hash_to_short)
+from paper_poller import (
+    CHANNEL_COLORS,
+    COLORS,
+    Color,
+    convert_build_date,
+    convert_commit_hash_to_short,
+)
 
 
 class TestConvertCommitHashToShort:
