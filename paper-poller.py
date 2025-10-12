@@ -61,7 +61,7 @@ elif os.path.exists("webhooks.json"):
         webhook_urls = json.load(f)["urls"]
 else:
     print("No webhook URL found, using default")
-    webhook_urls = ["url.here"]
+    webhook_urls = ["https://httpbin.org/post"]
 
 # Get start args
 start_args = sys.argv[1:]

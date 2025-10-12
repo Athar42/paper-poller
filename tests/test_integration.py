@@ -23,11 +23,12 @@ class TestSingleVersionMode:
     """Integration tests for single version mode."""
 
     @patch("paper_poller.client")
-    @patch("paper_poller.webhook_urls", [])
+    @patch("requests.post")
     @patch("time.sleep")  # Mock sleep to speed up tests
     def test_run_single_version_mode_up_to_date(
         self,
         mock_sleep,
+        mock_post,
         mock_client,
         tmp_path,
         monkeypatch,
@@ -36,17 +37,22 @@ class TestSingleVersionMode:
         """Test single version mode when already up to date."""
         monkeypatch.chdir(tmp_path)
 
-        # Setup mock GQL response
+        # Setup mock GQL response and post
         mock_client.execute.return_value = sample_latest_build_response
+        mock_post.return_value.status_code = 200
 
         # Create existing state file showing we're up to date
         api = PaperAPI()
         api.write_to_json("1.21.1", "123", "STABLE")
 
+        # Mock get_latest_build to use our fixture
+        api.get_latest_build = Mock(return_value=sample_latest_build_response)
+
         # Run the check
         api._run_single_version_mode()
 
-        # Verify no webhook was sent (we check by verifying sleep was called for rate limiting)
+        # Verify no webhook was sent (we're already up to date)
+        mock_post.assert_not_called()
         assert mock_sleep.called
 
     @patch("paper_poller.client")
@@ -132,11 +138,12 @@ class TestMultiVersionMode:
     """Integration tests for multi-version mode."""
 
     @patch("paper_poller.client")
-    @patch("paper_poller.webhook_urls", [])
+    @patch("requests.post")
     @patch("time.sleep")
     def test_run_multi_version_mode_all_up_to_date(
         self,
         mock_sleep,
+        mock_post,
         mock_client,
         tmp_path,
         monkeypatch,
@@ -147,17 +154,23 @@ class TestMultiVersionMode:
 
         # Setup mock GQL response
         mock_client.execute.return_value = sample_all_versions_response
+        mock_post.return_value.status_code = 200
 
         # Create existing state file for all versions
         api = PaperAPI()
         api.write_version_to_json("1.21.1", "123", "STABLE")
         api.write_version_to_json("1.21", "120", "RECOMMENDED")
 
+        # Mock get_all_versions to use our fixture
+        api.get_all_versions = Mock(return_value=sample_all_versions_response)
+
         # Run the check
         api._run_multi_version_mode()
 
         # Should call sleep for rate limiting
         assert mock_sleep.called
+        # No webhooks should be sent since all versions are up to date
+        mock_post.assert_not_called()
 
     @patch("paper_poller.client")
     @patch("requests.post")
@@ -203,11 +216,12 @@ class TestMultiVersionMode:
         assert data["versions"]["1.21"]["build"] == "120"
 
     @patch("paper_poller.client")
-    @patch("paper_poller.webhook_urls", [])
+    @patch("requests.post")
     @patch("time.sleep")
     def test_run_multi_version_mode_skips_empty_builds(
         self,
         mock_sleep,
+        mock_post,
         mock_client,
         tmp_path,
         monkeypatch,
@@ -218,8 +232,12 @@ class TestMultiVersionMode:
 
         # Setup mock GQL response (includes 1.20.6 with empty builds)
         mock_client.execute.return_value = sample_all_versions_response
+        mock_post.return_value.status_code = 200
 
         api = PaperAPI()
+
+        # Mock get_all_versions to use our fixture
+        api.get_all_versions = Mock(return_value=sample_all_versions_response)
 
         # Run the check - should not crash on empty builds
         api._run_multi_version_mode()
@@ -325,22 +343,27 @@ class TestErrorHandling:
         assert True
 
     @patch("paper_poller.client")
+    @patch("requests.post")
     @patch("time.sleep")
     def test_run_handles_missing_data(
-        self, mock_sleep, mock_client, tmp_path, monkeypatch, capsys
+        self, mock_sleep, mock_post, mock_client, tmp_path, monkeypatch
     ):
         """Test that run handles missing data in response."""
         monkeypatch.chdir(tmp_path)
 
         # Setup mock with incomplete data
         mock_client.execute.return_value = {"project": {}}
+        mock_post.return_value.status_code = 200
 
         api = PaperAPI()
 
-        # Should not crash
+        # Mock get_latest_build to return incomplete data
+        api.get_latest_build = Mock(return_value={"project": {}})
+
+        # Should not crash - error handling should catch it
         api._run_single_version_mode()
 
-        # Should complete
+        # Should complete without sending webhooks
         assert True
 
 
