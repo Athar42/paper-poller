@@ -150,16 +150,6 @@ def convert_build_date(date):
     return dt.strptime(date, "%Y-%m-%dT%H:%M:%S.%f%z")
 
 
-def get_spigot_drama() -> str | dict:
-    try:
-        response = requests.get("https://drama.mart.fyi/api", headers=headers)
-        data = response.json()
-        return data
-    except Exception as e:
-        print(f"Error getting spigot drama: {e}")
-        return "There's no drama :("
-
-
 class PaperAPI:
     def __init__(self, base_url="https://api.papermc.io/v2", project="paper"):
         self.headers = {
@@ -309,7 +299,6 @@ class PaperAPI:
         image_url,
         changes,
         download_url,
-        drama,
         channel_name,
         channel_changed,
     ):
@@ -335,8 +324,6 @@ class PaperAPI:
                         },
                         {"type": 14, "divider": True},
                         {"type": 10, "content": changes},
-                        {"type": 14, "divider": True},
-                        {"type": 10, "content": f"-# {drama['response']}"},
                     ],
                 },
                 {
@@ -384,7 +371,6 @@ class PaperAPI:
 
         # Send webhook to all configured URLs
         for hook in webhook_urls:
-            drama = get_spigot_drama()
             self.send_v2_webhook(
                 hook_url=hook,
                 latest_build=build_id,
@@ -393,7 +379,6 @@ class PaperAPI:
                 image_url=self.image_url,
                 changes=changes,
                 download_url=download_url,
-                drama=drama,
                 channel_name=channel_name.capitalize(),
                 channel_changed=channel_changed,
             )
