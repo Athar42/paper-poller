@@ -20,7 +20,6 @@ __all__ = [
     "PaperAPI",
     "convert_commit_hash_to_short",
     "convert_build_date",
-    "get_spigot_drama",
     "Color",
     "CHANNEL_COLORS",
     "CHECK_ALL_VERSIONS",
@@ -35,7 +34,6 @@ __all__ = [
 PaperAPI = paper_poller_main.PaperAPI
 convert_commit_hash_to_short = paper_poller_main.convert_commit_hash_to_short
 convert_build_date = paper_poller_main.convert_build_date
-get_spigot_drama = paper_poller_main.get_spigot_drama
 Color = paper_poller_main.Color
 CHANNEL_COLORS = paper_poller_main.CHANNEL_COLORS
 config = paper_poller_main.config

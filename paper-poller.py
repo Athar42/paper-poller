@@ -172,25 +172,6 @@ def convert_build_date(date: str) -> dt:
             raise
 
 
-def get_spigot_drama() -> str | dict:
-    """Fetch Spigot drama API response.
-
-    Returns:
-        Dictionary with drama response, or fallback string on error
-    """
-    try:
-        response = requests.get("https://drama.mart.fyi/api", headers=headers, timeout=Config.DEFAULT_REQUEST_TIMEOUT)
-        response.raise_for_status()  # Raise exception for bad status codes
-        data = response.json()
-        return data
-    except requests.RequestException as e:
-        logger.error(f"Error getting spigot drama: {e}")
-        return "There's no drama :("
-    except Exception as e:
-        logger.error(f"Error getting spigot drama: {e}")
-        return "There's no drama :("
-
-
 class PaperAPI:
     def __init__(self, base_url: str = "https://api.papermc.io/v2", project: str = "paper") -> None:
         self.headers = {
@@ -484,7 +465,6 @@ class PaperAPI:
         image_url: str,
         changes: str,
         download_url: str,
-        drama: str | dict,
         channel_name: str,
         channel_changed: bool,
     ) -> None:
@@ -498,7 +478,6 @@ class PaperAPI:
             image_url: URL to project logo image
             changes: Formatted string of commit changes
             download_url: URL to download the build
-            drama: Spigot drama response (string or dict)
             channel_name: Build channel name
             channel_changed: Whether the channel has changed from previous build
         """
@@ -524,11 +503,6 @@ class PaperAPI:
                         },
                         {"type": 14, "divider": True},
                         {"type": 10, "content": changes},
-                        {"type": 14, "divider": True},
-                        {
-                            "type": 10,
-                            "content": f"-# {drama.get('response', "There's no drama :(") if isinstance(drama, dict) else str(drama)}",
-                        },
                     ],
                 },
                 {
@@ -581,9 +555,6 @@ class PaperAPI:
             logger.error(f"Invalid build date format for {self.project} {version_id} build {build_id}: {e}")
             return
 
-        # Get drama once for all webhooks
-        drama = get_spigot_drama()
-
         # Send webhook to all configured URLs
         for hook in config.webhook_urls:
             self.send_v2_webhook(
@@ -594,7 +565,6 @@ class PaperAPI:
                 image_url=self.image_url,
                 changes=changes,
                 download_url=download_url,
-                drama=drama,
                 channel_name=channel_name.capitalize(),
                 channel_changed=channel_changed,
             )
